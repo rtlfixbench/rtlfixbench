@@ -1,0 +1,11 @@
+{
+    "bugs": {
+        "decoder_3to8_buggy_var": [
+            {"buggy": "decoder_3to8_buggy_var.v", "original": "decoder_3to8.v"}
+        ]
+    },
+    "top_module": "decoder_3to8",
+    "top_file": "decoder_3to8.v",
+    "sources": ["decoder_3to8.v"],
+    "ignore": true
+}

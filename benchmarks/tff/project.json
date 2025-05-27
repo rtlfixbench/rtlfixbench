@@ -1,0 +1,11 @@
+{
+    "bugs": {
+        "tff_wadden_buggy1": [
+            {"buggy": "tff_wadden_buggy1.v", "original": "tff.v"}
+        ]
+    },
+    "top_module": "tff",
+    "top_file": "tff.v",
+    "sources": ["tff.v"],
+    "ignore": true
+}

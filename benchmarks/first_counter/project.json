@@ -1,0 +1,11 @@
+{
+    "bugs": {
+        "first_counter_buggy_overflow": [
+            {"buggy": "first_counter_buggy_overflow.v", "original": "first_counter.v"}
+        ]
+    },
+    "top_module": "first_counter",
+    "top_file": "first_counter.v",
+    "sources": ["first_counter.v"],
+    "ignore": false
+}

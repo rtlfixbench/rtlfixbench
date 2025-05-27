@@ -1,0 +1,16 @@
+{
+    "gens": 10,
+    "restarts": 2,
+    "popsize": 10000,
+    "dependency_set_max": 10,
+    "mutation_rate": 0.7,
+    "deletion_rate": 0.3,
+    "crossover_rate": 0.3,
+    "insertion_rate": 0.3,
+    "replacement_rate": 0.4,
+    "fault_loc": true,
+    "control_flow": true,
+    "limit_transitive_dependency_set": true,
+    "seed": "repair_2020-09-23-11:24:14",
+    "fitness_mode": "outputwires"
+}

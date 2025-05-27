@@ -1,0 +1,75 @@
+#-----------------------------------------
+# Module Specification: first_counter
+#-----------------------------------------
+
+# General Module Information
+name = "first_counter"
+description = "4-bit up-counter with synchronous active-high reset, enable control, and overflow detection."
+
+# Port Definitions
+[[ports]]
+name = "clk"
+direction = "input"
+width = 1
+description = "Clock input for synchronization."
+
+[[ports]]
+name = "reset"
+direction = "input"
+width = 1
+description = "Active-high synchronous reset signal. Resets counter to 0 when asserted."
+
+[[ports]]
+name = "enable"
+direction = "input"
+width = 1
+description = "Active-high enable signal. Allows counter increment when asserted."
+
+[[ports]]
+name = "counter_out"
+direction = "output"
+width = 4
+description = "4-bit output representing the current count value (0 to 15)."
+
+[[ports]]
+name = "overflow_out"
+direction = "output"
+width = 1
+description = "Overflow indicator. Set to 1 when counter reaches maximum value (15)."
+
+# Implementation Details
+[implementation.reset]
+description = "Resets counter to 0 and clears overflow_out on the rising edge of clk when asserted."
+
+[implementation.enable]
+description = "Counter increments by 1 on the rising edge of clk if enable = 1 and reset = 0."
+
+[implementation.overflow_detection]
+description = "overflow_out is set to 1 when counter_out = 15 (4'b1111). Remains 1 until reset or next overflow event."
+
+[implementation.counter_operation]
+description = "Wraps to 0 after reaching 15. Increments only when enable is active."
+
+# Example Usage
+example_usage = """
+When enable = 1:
+0 → 1 → 2 → ... → 15 → 0 → 1...
+overflow_out = 1 during the cycle when counter_out = 15.
+Reset clears counter_out and overflow_out immediately.
+"""
+
+# Key Notes
+[notes]
+note1 = "overflow_out persists at 1 after reaching 15 until reset or next overflow."
+note2 = "All operations are synchronized to the rising edge of clk."
+
+# Module Interface
+module_interface = '''
+module first_counter(
+    input clk,
+    input reset,
+    input enable,
+    output [3:0] counter_out,
+    output overflow_out
+);
+'''

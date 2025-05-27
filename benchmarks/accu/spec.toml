@@ -1,0 +1,85 @@
+#-----------------------------------------
+# Module Specification: accu
+#-----------------------------------------
+
+# General Module Information
+name = "accu"
+description = "8-bit serial input accumulator that sums 4 consecutive valid inputs and outputs a 10-bit sum with valid indication."
+
+# Port Definitions
+[[ports]]
+name = "clk"
+direction = "input"
+width = 1
+description = "Clock input for synchronization."
+
+[[ports]]
+name = "rst_n"
+direction = "input"
+width = 1
+description = "Active-low reset signal."
+
+[[ports]]
+name = "data_in"
+direction = "input"
+width = 8
+description = "8-bit input data for addition."
+
+[[ports]]
+name = "valid_in"
+direction = "input"
+width = 1
+description = "Input signal indicating readiness for new data."
+
+[[ports]]
+name = "valid_out"
+direction = "output"
+width = 1
+description = "Output signal indicating when 4 input data accumulation is reached."
+
+[[ports]]
+name = "data_out"
+direction = "output"
+width = 10
+description = "10-bit output data representing the accumulated sum of 4 inputs."
+
+# Implementation Details
+[implementation.reset]
+description = "Active-low asynchronous reset. Clears all internal registers and outputs when asserted."
+
+[implementation.accumulation]
+description = "When valid_in is 1, data_in is accumulated. After 4 valid inputs, outputs the sum and pulses valid_out for 1 cycle."
+
+[implementation.output_behavior]
+description = "data_out shows sum of 4 most recent valid inputs. valid_out pulses high for 1 cycle when new sum is available."
+
+[implementation.counter_operation]
+description = "Internal counter tracks number of valid inputs received. Resets after every 4 valid inputs."
+
+# Example Usage
+example_usage = """
+With valid_in = 1:
+Cycle 1: data_in = 10 → internal sum = 10 (count = 1)
+Cycle 2: data_in = 20 → internal sum = 30 (count = 2)
+Cycle 3: data_in = 30 → internal sum = 60 (count = 3)
+Cycle 4: data_in = 40 → data_out = 100, valid_out = 1 (count resets)
+Cycle 5: accumulation begins anew
+"""
+
+# Key Notes
+[notes]
+note1 = "valid_out remains 0 until exactly 4 valid inputs have been received."
+note2 = "All operations are synchronized to the rising edge of clk."
+note3 = "Internal accumulation registers are cleared on reset."
+
+# Module Interface
+module_interface = '''
+module accu(
+    input clk,
+    input rst_n,
+    input [7:0] data_in,
+    input valid_in,
+    output reg valid_out,
+    output reg [9:0] data_out
+);
+'''

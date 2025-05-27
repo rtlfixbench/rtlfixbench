@@ -1,0 +1,115 @@
+#-----------------------------------------
+# Module Specification: decoder_3to8
+#-----------------------------------------
+
+# General Module Information
+name = "decoder_3to8"
+description = "3-to-8 decoder with active-high enable input. Outputs are active-low."
+
+# Port Definitions
+[[ports]]
+name = "Y7"
+direction = "output"
+width = 1
+description = "Output for binary input 111 (when enabled). Active-low."
+
+[[ports]]
+name = "Y6"
+direction = "output"
+width = 1
+description = "Output for binary input 110 (when enabled). Active-low."
+
+[[ports]]
+name = "Y5"
+direction = "output"
+width = 1
+description = "Output for binary input 101 (when enabled). Active-low."
+
+[[ports]]
+name = "Y4"
+direction = "output"
+width = 1
+description = "Output for binary input 100 (when enabled). Active-low."
+
+[[ports]]
+name = "Y3"
+direction = "output"
+width = 1
+description = "Output for binary input 011 (when enabled). Active-low."
+
+[[ports]]
+name = "Y2"
+direction = "output"
+width = 1
+description = "Output for binary input 010 (when enabled). Active-low."
+
+[[ports]]
+name = "Y1"
+direction = "output"
+width = 1
+description = "Output for binary input 001 (when enabled). Active-low."
+
+[[ports]]
+name = "Y0"
+direction = "output"
+width = 1
+description = "Output for binary input 000 (when enabled). Active-low."
+
+[[ports]]
+name = "A"
+direction = "input"
+width = 1
+description = "Least significant bit of input address."
+
+[[ports]]
+name = "B"
+direction = "input"
+width = 1
+description = "Middle bit of input address."
+
+[[ports]]
+name = "C"
+direction = "input"
+width = 1
+description = "Most significant bit of input address."
+
+[[ports]]
+name = "en"
+direction = "input"
+width = 1
+description = "Active-high enable signal. When low, all outputs are inactive (high)."
+
+# Implementation Details
+[implementation.decoding]
+description = "Outputs are decoded combinationally based on {en,A,B,C} inputs. Only one output is active (low) at a time when enabled."
+
+[implementation.enable_operation]
+description = "When en = 0, all outputs remain inactive (1). When en = 1, one output goes low based on {C,B,A} value."
+
+[implementation.output_encoding]
+description = "Outputs are active-low (0 = active, 1 = inactive). Y0 corresponds to 000 input, Y7 to 111 input."
+
+# Example Usage
+example_usage = """
+When en = 1:
+- {C,B,A} = 000 → Y0 = 0, others = 1
+- {C,B,A} = 001 → Y1 = 0, others = 1
+- ...
+- {C,B,A} = 111 → Y7 = 0, others = 1
+When en = 0: All outputs = 1 regardless of {C,B,A} inputs
+"""
+
+# Key Notes
+[notes]
+note1 = "This is a combinational circuit with no clock input."
+note2 = "Outputs change immediately with input changes (no synchronization)."
+note3 = "Outputs are active-low, which is common for decoder chips."
+
+# Module Interface
+module_interface = '''
+module decoder_3to8(
+    output Y7, Y6, Y5, Y4, Y3, Y2, Y1, Y0,
+    input A, B, C,
+    input en
+);
+'''

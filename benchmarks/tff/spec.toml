@@ -1,0 +1,64 @@
+#-----------------------------------------
+# Module Specification: tff
+#-----------------------------------------
+
+# General Module Information
+name = "tff"
+description = "T flip-flop with synchronous clock, active-low reset (priority), and toggle functionality."
+
+# Port Definitions
+[[ports]]
+name = "clk"
+direction = "input"
+width = 1
+description = "Clock input for synchronous operation. All state changes occur on its rising edge."
+
+[[ports]]
+name = "rstn"
+direction = "input"
+width = 1
+description = "Active-low reset (priority signal). When low, resets output 'q' to 0 on the next rising clock edge, overriding toggle input."
+
+[[ports]]
+name = "t"
+direction = "input"
+width = 1
+description = "Toggle input. When high (and rstn is inactive), toggles output 'q' on the rising edge of clk."
+
+[[ports]]
+name = "q"
+direction = "output"
+width = 1
+description = "Output of the T flip-flop. State changes occur synchronously with clk."
+
+# Implementation Details
+[implementation.reset]
+description = "Synchronous active-low reset with priority. On clk's rising edge, if rstn=0, q is set to 0 (override toggle)."
+
+[implementation.toggle]
+description = "Toggle operation only occurs when rstn=1. On clk's rising edge, if rstn=1 and t=1, q inverts its state."
+
+# Example Usage
+example_usage = """
+- Reset Priority:
+    - When rstn=0: q becomes 0 on next clk edge (regardless of t).
+- Normal Operation (rstn=1):
+    - t=1: q toggles on clk's rising edge.
+    - t=0: q retains current value.
+"""
+
+# Key Notes
+[notes]
+note1 = "Reset (rstn) is active-low (0 = reset) and has highest priority."
+note2 = "All operations are synchronized to clk's rising edge."
+note3 = "Reset operation overrides toggle functionality."
+
+# Module Interface
+module_interface = '''
+module tff(
+    input clk,
+    input rstn,
+    input t,
+    output reg q
+);
+'''

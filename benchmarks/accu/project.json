@@ -1,0 +1,11 @@
+{
+    "bugs": {
+        "accu_func_logic_error": [
+            {"buggy": "accu_func_logic_error.v", "original": "accu.v"}
+        ]
+    },
+    "top_module": "accu",
+    "top_file": "accu.v",
+    "sources": ["accu.v"],
+    "ignore": true
+}

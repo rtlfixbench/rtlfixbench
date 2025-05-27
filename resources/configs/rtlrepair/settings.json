@@ -1,0 +1,6 @@
+{
+    "solver": "yices2",
+    "init": "any",
+    "incremental": false,
+    "verbose": false
+}
