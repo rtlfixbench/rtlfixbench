@@ -1,0 +1,52 @@
+[meta]
+name = "pulse_detect"
+description = "Detects 3-cycle pulses in a 1-bit input stream of the pattern 0→1→0, outputting a single-cycle high pulse at the end."
+
+[interface]
+clk      = "input - Clock signal for synchronous state transitions"
+rst_n    = "input - Active-low reset signal"
+data_in  = "input - Serial 1-bit input signal"
+data_out = "output reg - Pulse detection result (1-cycle high at end of 010 pattern)"
+
+[state_encoding]
+s0 = "2'b00 - Initial state or idle"
+s1 = "2'b01 - Detected 0"
+s2 = "2'b10 - Detected 01"
+s3 = "2'b11 - Detected 010 (pulse end, trigger output)"
+
+[datapath]
+fsm = """
+  - 2-bit FSM tracks 3-cycle pattern in input data stream.
+  - state transitions: s0→s1 (0), s1→s2 (1), s2→s3 (0)
+  - stays in s3 or returns depending on next input bit.
+  - output is asserted only when pattern 010 is complete (i.e., at s2 and next bit is 0).
+"""
+
+[behavior]
+type = "Pattern Detector FSM"
+pulse_pattern = "Detects 3-cycle sequence 0→1→0"
+output_assertion = "data_out is high for 1 clock cycle after detecting the pattern 010"
+reset_behavior = "On rst_n==0, FSM state is reset to s0, output is set to 0"
+timing_control = "FSM state transitions occur on posedge clk or negedge rst_n"
+output_control = "data_out determined combinationally from state + data_in"
+
+[timing]
+sensitivity = "posedge clk or negedge rst_n"
+latency = "3-cycle detection"
+output_valid_cycle = "Last cycle (data_in==0) of the 010 pattern"
+
+[assertions]
+pattern_valid = "If data_in cycles through 010, data_out is asserted in the 3rd cycle"
+reset_clear = "If rst_n == 0, pulse_level1 is reset to s0, data_out == 0"
+no_false_positive = "data_out == 1 only if the pattern 010 was just seen"
+
+[testbench]
+stimulus = """
+- Feed input sequence: 0 → 1 → 0 → ...
+- Apply clk signal, hold rst_n low for 1 cycle, then release
+- Verify data_out is 1 only after a full 010 pattern
+"""
+expected = """
+- For input: 01010 → data_out: 00101
+- FSM correctly tracks and resets through pattern transitions
+"""

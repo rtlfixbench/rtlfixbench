@@ -1,0 +1,77 @@
+[meta]
+name = "multi_pipe_8bit"
+description = "Pipelined 8-bit multiplier with partial product generation and accumulation over multiple stages"
+author = "User"
+version = "1.0"
+
+[parameter]
+size = "Input bit-width of multiplicand/multiplier (default: 8)"
+
+[interface]
+clk = "input - Clock signal for synchronous pipeline operation"
+rst_n = "input - Active-low reset signal"
+mul_en_in = "input - Input enable signal for starting multiplication"
+mul_a = "input [size-1:0] - Multiplicand"
+mul_b = "input [size-1:0] - Multiplier"
+mul_en_out = "output reg - Output enable signal indicating valid output"
+mul_out = "output reg [size*2-1:0] - 16-bit multiplication result"
+
+[behavior]
+type = "sequential (multi-stage pipeline)"
+description = """
+The module implements an unsigned 8×8 multiplier with pipelined stages.
+It uses bit-wise conditional shifting to form partial products, then adds them over two pipeline stages to generate the final result.
+Timing alignment is managed using a 3-stage shift register `mul_en_out_reg` to synchronize `mul_en_in` with the output `mul_out`.
+
+Pipeline stages:
+- Stage 0: Input sampling and partial product generation (temp[0] ~ temp[7])
+- Stage 1: Partial sum grouping (sum[0] ~ sum[3])
+- Stage 2: Final accumulation (mul_out_reg)
+- Stage 3: Output register gating (mul_out)
+"""
+
+[internal]
+mul_en_out_reg = { width = 3, description = "Pipeline register for enable signal propagation" }
+mul_a_reg = { width = 8, description = "Register storing sampled multiplicand" }
+mul_b_reg = { width = 8, description = "Register storing sampled multiplier" }
+temp = { width = "16 × size", description = "Partial products for each bit of multiplier (bitwise shifted multiplicand)" }
+sum = { width = "4 × 16", description = "Group-wise sum of partial products: sum[0..3]" }
+mul_out_reg = { width = 16, description = "Final accumulated result from all partial sums" }
+
+[algorithm]
+steps = """
+1. Sample mul_a and mul_b on clk when mul_en_in == 1
+2. Generate partial products:
+   - If mul_b[i] == 1: temp[i] = mul_a << i
+   - Else: temp[i] = 0
+3. Compute partial sums:
+   - sum[0] = temp[0] + temp[1]
+   - sum[1] = temp[2] + temp[3]
+   - sum[2] = temp[4] + temp[5]
+   - sum[3] = temp[6] + temp[7]
+4. Compute final result:
+   - mul_out_reg = sum[0] + sum[1] + sum[2] + sum[3]
+5. Output mul_out when mul_en_out_reg[2] == 1
+"""
+
+[assertions]
+reset_behavior = "All internal registers are cleared when rst_n is 0"
+output_timing = "mul_out is valid only when mul_en_out == 1"
+enable_propagation = "mul_en_out delayed by exactly 3 cycles from mul_en_in"
+partial_product_correctness = "temp[i] == (mul_b[i] ? mul_a << i : 0)"
+sum_correctness = "mul_out == ∑ temp[i] for i ∈ [0,7]"
+
+[testbench]
+stimulus = """
+- Basic: mul_a = 5, mul_b = 3 → mul_out = 15
+- Edge: mul_a = 0 or mul_b = 0 → mul_out = 0
+- Large: mul_a = 255, mul_b = 255 → mul_out = 65025
+- Single-bit: mul_b = 1, mul_a = any → mul_out = mul_a
+- Random values with controlled enable toggling
+"""
+check = """
+- Compare mul_out against golden reference (mul_a × mul_b)
+- Check mul_out is valid exactly 3 cycles after mul_en_in is high
+- Verify pipeline clears correctly on reset
+- Confirm temp and sum values match expected intermediate values
+"""

@@ -1,0 +1,65 @@
+[meta]
+name = "parallel2serial"
+description = "4-bit parallel-to-serial converter with MSB-first output and cycle-valid control"
+author = "User"
+version = "1.0"
+
+[interface]
+clk = "input - Clock signal for synchronous operation"
+rst_n = "input - Active-low reset signal"
+d = "input [3:0] - Parallel 4-bit input data"
+valid_out = "output - Indicates availability of new serial data"
+dout = "output - Serial bit output (MSB first)"
+
+[behavior]
+type = "sequential"
+description = """
+The module converts 4-bit parallel data into a 1-bit serial stream over 4 clock cycles.
+- On every 4th cycle (cnt == 3), it loads a new parallel word `d` into a shift register `data`, resets the counter, and asserts `valid_out = 1`.
+- In other cycles (cnt < 3), it left-shifts the `data` register and outputs MSB at `dout`.
+- The counter tracks how many bits have been output.
+- Serial output order is: d[3], d[2], d[1], d[0].
+
+Note: Data rotates by `data <= {data[2:0], data[3]}`; effectively circular left-shift to serialize from MSB to LSB.
+"""
+
+[internal]
+data = { width = 4, description = "Shift register holding serializing data" }
+cnt = { width = 2, description = "2-bit counter for output cycle tracking (0 to 3)" }
+valid = { width = 1, description = "Output valid flag, high when new data word starts output" }
+
+[algorithm]
+steps = """
+1. On reset:
+   - data <= 0, cnt <= 0, valid <= 0
+2. On clk rising edge:
+   - If cnt == 3:
+     - Load data <= d
+     - cnt <= 0
+     - valid <= 1
+   - Else:
+     - cnt <= cnt + 1
+     - Shift data left by 1 (MSB to LSB via circular shift)
+     - valid <= 0
+3. Output:
+   - dout = data[3] (MSB of data register)
+   - valid_out = valid
+"""
+
+[assertions]
+reset_behavior = "data, cnt, and valid are all reset to 0 on rst_n == 0"
+valid_timing = "valid_out is high only once every 4 cycles when new word is loaded"
+shift_correctness = "data shifts circularly: {data[2:0], data[3]}"
+output_sequence = "Output order is d[3], d[2], d[1], d[0] on consecutive cycles"
+
+[testbench]
+stimulus = """
+- Apply known 4-bit input `d = 4'b1101`, observe serial outputs for 4 cycles
+- Apply reset mid-sequence to ensure state reset
+- Provide multiple `d` values with gaps to validate periodicity
+"""
+check = """
+- Verify that dout outputs bits in order: d[3], d[2], d[1], d[0]
+- Confirm valid_out == 1 on first bit (d[3]) only
+- Confirm dout is updated every clock and circular shift occurs correctly
+"""

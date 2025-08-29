@@ -1,0 +1,44 @@
+[meta]
+name = "pe"
+description = "32-bit Multiply-Accumulate Processing Element (MAC PE)"
+
+[interface]
+clk = "input - Clock signal used for synchronous operation"
+rst = "input - Active-high reset signal"
+a   = "input - 32-bit input operand A"
+b   = "input - 32-bit input operand B"
+c   = "output reg - 32-bit accumulated result register"
+
+[datapath]
+accumulator_c = """
+  - Accumulates the result of a * b on every rising edge of clk
+  - Reset to 0 when rst == 1
+  - Operates as a Multiply-Accumulate (MAC) unit
+"""
+
+[behavior]
+type = "Pipelined Multiply-Accumulate (MAC)"
+reset_behavior = "If rst == 1, accumulator register c is cleared to 0"
+mac_operation = "If rst == 0, then c <= c + a * b on every clk rising edge"
+accumulation_range = "Since c accumulates indefinitely, overflow may occur unless controlled externally"
+
+[timing]
+sensitivity = "posedge clk or posedge rst"
+latency = "1 cycle MAC accumulation"
+pipeline_stages = 1
+
+[assertions]
+reset_clear = "When rst == 1, c == 0"
+accumulation_behavior = "After N valid cycles, c == sum of a[i]*b[i] for i in 0..N-1"
+zero_input = "If a == 0 or b == 0, then c remains unchanged unless rst"
+
+[testbench]
+stimulus = """
+- Apply rst=1 for one cycle to reset
+- Set inputs a and b to known values
+- Observe output c after each clk rising edge
+"""
+expected = """
+- After each cycle, c accumulates the value of a*b
+- c resets to 0 when rst is asserted
+"""

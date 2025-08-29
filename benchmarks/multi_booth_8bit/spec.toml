@@ -1,0 +1,78 @@
+[meta]
+name = "multi_booth_8bit"
+description = "8-bit sequential multiplier using Radix-2 Booth algorithm with ready signal output"
+author = "User"
+version = "1.0"
+
+[interface]
+clk = "input - Clock signal for synchronous multiplication"
+reset = "input - Active-high reset to initialize multiplication process"
+a = "input [7:0] - Multiplicand (signed 8-bit)"
+b = "input [7:0] - Multiplier (signed 8-bit)"
+p = "output [15:0] - Product result (signed 16-bit)"
+rdy = "output - Ready flag set to 1 when multiplication completes"
+
+[behavior]
+type = "sequential"
+description = """
+This module performs signed 8-bit × 8-bit multiplication using the Radix-2 Booth algorithm.
+The multiplication runs sequentially over 16 clock cycles.
+
+On reset:
+- Multiplier is sign-extended from input `a`
+- Multiplicand is sign-extended from input `b`
+- Registers `p`, `ctr`, `rdy` are cleared
+
+During multiplication:
+- At each clock cycle:
+    - If `multiplier[ctr] == 1`, current `multiplicand` is added to `p`
+    - `multiplicand` is shifted left by 1 (logical shift)
+    - `ctr` is incremented
+- When `ctr` reaches 16, `rdy` is set to 1, indicating computation completion
+
+Note: This is a simplified Radix-2 Booth implementation (not Radix-4),
+with a left-shifting multiplicand and fixed control over multiplier bits.
+"""
+
+[internal]
+multiplier = { width = 16, description = "Sign-extended multiplier from input `a`" }
+multiplicand = { width = 16, description = "Sign-extended multiplicand from input `b`, shifted left each cycle" }
+p = { width = 16, description = "Product accumulator register" }
+ctr = { width = 5, description = "5-bit counter, counts from 0 to 15 (16 cycles)" }
+rdy = { width = 1, description = "Ready flag, asserted when ctr reaches 16" }
+
+[algorithm]
+type = "Radix-2 Booth algorithm"
+steps = """
+1. Sign-extend inputs: multiplier = {{8{a[7]}}, a}, multiplicand = {{8{b[7]}}, b}
+2. Initialize p = 0, ctr = 0, rdy = 0
+3. For each bit [0..15] of multiplier:
+   - If multiplier[ctr] == 1:
+       - p += multiplicand
+   - multiplicand <<= 1
+   - ctr += 1
+4. When ctr == 16:
+   - Set rdy = 1
+"""
+
+[assertions]
+reset_behavior = "Upon reset, p = 0, ctr = 0, multiplier/multiplicand sign-extended from a and b"
+completion_flag = "rdy == 1 only after ctr reaches 16"
+correctness = "p == a × b (signed)"
+no_overflow = "multiplicand/multiplier stay within 16 bits during operation"
+
+[testbench]
+stimulus = """
+- Normal: a = 5, b = 3 → expect p = 15
+- Negative × Positive: a = -7, b = 4 → expect p = -28
+- Positive × Negative: a = 6, b = -3 → expect p = -18
+- Negative × Negative: a = -5, b = -2 → expect p = 10
+- a = 0, b = any → expect p = 0
+- b = 0, a = any → expect p = 0
+"""
+check = """
+- Monitor `p` after rdy == 1, compare against behavioral model: signed(a) * signed(b)
+- Ensure rdy asserted only after 16 cycles
+- Check multiplicand shift and accumulation behavior
+- Confirm correct sign-extension of a and b
+"""

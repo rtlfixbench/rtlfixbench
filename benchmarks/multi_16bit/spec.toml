@@ -1,0 +1,65 @@
+[meta]
+name = "multi_16bit"
+description = "Unsigned 16-bit shift-and-accumulate multiplier"
+author = "User"
+version = "1.0"
+
+[interface]
+clk     = "input - Chip clock signal"
+rst_n   = "input - Active-low reset signal"
+start   = "input - Start signal to initiate multiplication"
+ain     = "input - 16-bit unsigned multiplicand"
+bin     = "input - 16-bit unsigned multiplier"
+yout    = "output - 32-bit multiplication result"
+done    = "output - Operation completion flag"
+
+[behavior]
+type = "Shift-and-accumulate multiplier"
+width = "16-bit operands, 32-bit result"
+description = """
+Implements an unsigned 16-bit multiplier using serial shift-and-accumulate logic:
+- Uses internal 16-bit registers `areg` and `breg` to store inputs `ain` and `bin`.
+- For each clock cycle where `start == 1`, if bit areg[i-1] is 1, `yout_r` accumulates shifted `breg` left by (i-1).
+- After 16 cycles, computation completes; `done` flag is raised for 1 cycle.
+"""
+
+[timing]
+sensitivity = "posedge clk or negedge rst_n"
+cycle_count = 17
+reset_behavior = "If rst_n is low, all registers and control counters are reset to 0"
+done_flag_timing = "done is asserted when i == 16, cleared when i == 17"
+control_flow = """
+- i counts from 0 to 17 when start is held high.
+- Multiplicand and multiplier are latched at i == 0.
+- Multiplication occurs from i == 1 to i == 16.
+"""
+
+[datapath]
+areg = "Stores ain at i == 0"
+breg = "Stores bin at i == 0"
+yout_r = "32-bit result register; accumulates shifted breg values where areg[i-1] == 1"
+
+[accumulate_logic]
+operation = "yout_r += (breg << (i-1)) if areg[i-1] == 1"
+condition = "Effective for 1 <= i <= 16"
+
+[output]
+yout = "Assigned from yout_r at all times"
+done = "Asserted for 1 cycle when i == 16 (computation complete)"
+
+[assertions]
+init_assert = "When rst_n == 0, areg == breg == yout_r == 0, i == 0, done == 0"
+start_assert = "When start is deasserted, i is reset to 0"
+done_assert = "When i == 16, done == 1; when i == 17, done == 0"
+
+[testbench]
+stimulus = """
+- Apply rst_n = 0 for 1 cycle, then set rst_n = 1.
+- Apply start = 1 for at least 17 cycles while feeding ain and bin.
+- Observe yout and done outputs.
+"""
+expected_behavior = """
+- After 17 cycles from start, yout equals ain * bin.
+- done goes high for exactly one cycle after 16th accumulation.
+- Partial products are accumulated correctly based on areg[i-1].
+"""

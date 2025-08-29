@@ -1,0 +1,57 @@
+[meta]
+name = "multi_pipe_4bit"
+description = "4-bit unsigned pipeline multiplier using partial product accumulation"
+author = "User"
+version = "1.0"
+
+[parameter]
+size = 4
+N = "2 * size"
+
+[interface]
+clk      = "input - Clock signal for synchronous logic"
+rst_n    = "input - Active-low reset signal"
+mul_a    = "input - Multiplicand of width [size-1:0]"
+mul_b    = "input - Multiplier of width [size-1:0]"
+mul_out  = "output reg - Final multiplication result of width [2*size-1:0]"
+
+[datapath]
+mul_a_extend = "Zero-extended version of mul_a to 2*size bits"
+mul_b_extend = "Zero-extended version of mul_b to 2*size bits"
+mul_result   = "Partial product array: if mul_b[i] == 1 then (mul_a_extend << i), else 0"
+sum_tmp1     = "sum of mul_result[0] + mul_result[1], latched at stage 1"
+sum_tmp2     = "sum of mul_result[2] + mul_result[3], latched at stage 1"
+mul_out      = "sum_tmp1 + sum_tmp2, latched at stage 2 as final result"
+
+[behavior]
+type = "Two-stage pipelined multiplier"
+stage_1 = """
+  - Partial products are computed combinationally using generate loop
+  - At posedge clk, sum_tmp1 = mul_result[0] + mul_result[1]
+                     sum_tmp2 = mul_result[2] + mul_result[3]
+"""
+stage_2 = """
+  - At next clk, final result is computed: mul_out = sum_tmp1 + sum_tmp2
+"""
+reset_behavior = "If rst_n == 0, all pipeline registers and mul_out are cleared to 0"
+
+[timing]
+sensitivity = "posedge clk or negedge rst_n"
+latency = "2 cycles from input to valid mul_out"
+pipeline_stages = 2
+
+[assertions]
+reset_clear = "When rst_n == 0, mul_out == 0 and all intermediates cleared"
+mul_zero    = "If mul_a == 0 or mul_b == 0, then mul_out == 0 after 2 cycles"
+mul_max     = "If mul_a == 15 and mul_b == 15, then mul_out == 225 (0xE1)"
+
+[testbench]
+stimulus = """
+- Apply rst_n low for 1 cycle to clear registers
+- Set inputs mul_a and mul_b to known values
+- Assert clk for 2 cycles, observe mul_out
+"""
+expected = """
+- mul_out reflects mul_a * mul_b after 2 clock cycles
+- intermediate values sum_tmp1 and sum_tmp2 are computed correctly
+"""
