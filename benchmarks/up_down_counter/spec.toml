@@ -1,0 +1,37 @@
+[meta]
+name = "up_down_counter"
+description = "A 16-bit counter that increments or decrements based on control signals, with wrap-around behavior."
+version = "1.0"
+author = "User"
+
+[interface]
+clk     = "input  - 1-bit clock signal for synchronous operation"
+reset   = "input  - 1-bit active-high reset, clears counter to 0"
+up_down = "input  - 1-bit control signal: 1=increment, 0=decrement"
+count   = "output - 16-bit current counter value"
+
+[behavior]
+reset_behavior   = "When reset=1, counter is immediately reset to 0."
+increment_mode   = "When up_down=1, counter increments by 1 each clock. If maximum 65535 is reached, counter wraps to 0."
+decrement_mode   = "When up_down=0, counter decrements by 1 each clock. If counter=0, it wraps to 65535."
+synchronous_rule = "All state changes occur on the rising edge of clk."
+
+[properties]
+width        = "16 bits, range 0–65535"
+wraparound   = "Counter cycles through full range, wraps on overflow/underflow"
+direction    = "Counting direction is determined by up_down signal"
+mutual_excl  = "Counter cannot increment and decrement simultaneously; direction determined exclusively by up_down"
+
+[testbench]
+stimulus = """
+1) Apply reset=1 → expect count=0.
+2) Release reset, set up_down=1 → after 3 clocks, expect count=3.
+3) Continue incrementing until count=65535 → next clock expect wrap to 0.
+4) Set up_down=0 → after 2 clocks, expect count=65534.
+5) Continue decrementing until count=0 → next clock expect wrap to 65535.
+"""
+expected = """
+- Reset always clears count to 0.
+- In increment mode, counter wraps from 65535 to 0.
+- In decrement mode, counter wraps from 0 to 65535.
+"""

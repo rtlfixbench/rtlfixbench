@@ -1,0 +1,105 @@
+[meta]
+name = "traffic_light"
+description = "Traffic light controller with pedestrian request override and countdown output"
+author = "User"
+version = "1.0"
+
+[parameter]
+STATE_IDLE = 0
+STATE_RED = 1
+STATE_YELLOW = 2
+STATE_GREEN = 3
+DEFAULT_CNT = 10
+
+[interface]
+clk = "input - Clock signal for all synchronous operations"
+rst_n = "input - Active-low reset signal"
+pass_request = "input - Pedestrian request signal. When asserted during green phase, requests early transition to yellow if green time > 10"
+clock = "output [7:0] - Current countdown value (cnt), reflects remaining time in current state"
+red = "output reg - Red light indicator"
+yellow = "output reg - Yellow light indicator"
+green = "output reg - Green light indicator"
+
+[behavior]
+type = "finite state machine (FSM)"
+fsm_description = """
+FSM has 4 states:
+- IDLE: Initialization phase, all lights off. Transition to RED.
+- RED (STATE_RED): Red light active. After `cnt == 3`, transition to GREEN.
+- GREEN (STATE_GREEN): Green light active. After `cnt == 3`, transition to YELLOW.
+- YELLOW (STATE_YELLOW): Yellow light active. After `cnt == 3`, transition to RED.
+"""
+signal_flow = """
+- Internal state transition logic updates `p_red`, `p_yellow`, `p_green`.
+- Actual `red`, `yellow`, `green` outputs are registered versions of `p_*` values.
+- Counter `cnt` is initialized or adjusted based on transitions:
+    * GREEN → 60 cycles unless overridden by pass_request.
+    * YELLOW → 5 cycles
+    * RED → 10 cycles
+- If pedestrian button is pressed and green time > 10, counter shortens to 10.
+"""
+
+[internal]
+state = { width = 2, description = "2-bit FSM state register" }
+cnt = { width = 8, description = "8-bit countdown timer for current state duration" }
+p_red = { width = 1, description = "Next value for red output (combinational)" }
+p_yellow = { width = 1, description = "Next value for yellow output (combinational)" }
+p_green = { width = 1, description = "Next value for green output (combinational)" }
+
+[algorithm]
+steps = """
+1. On reset (rst_n = 0), initialize state to IDLE and cnt to 10.
+2. In IDLE state, clear all lights, move to RED state.
+3. In RED state:
+   - red = 1, others = 0
+   - if cnt == 3 → GREEN
+4. In GREEN state:
+   - green = 1, others = 0
+   - if pass_request && cnt > 10 → cnt = 10
+   - if cnt == 3 → YELLOW
+5. In YELLOW state:
+   - yellow = 1, others = 0
+   - if cnt == 3 → RED
+6. In all states, cnt decrements each clock.
+   - On state transition, cnt is reloaded to appropriate preset (60, 10, or 5)
+"""
+
+[timing]
+clk_edge = "posedge"
+reset_behavior = "All signals reset to default (state=IDLE, cnt=10, red/yellow/green=0)"
+count_behavior = """
+- cnt is reloaded to:
+   * 60 when entering GREEN
+   * 10 when entering RED
+   * 5 when entering YELLOW
+- cnt decrements every cycle unless reloaded
+- If pass_request is high during GREEN and cnt > 10, shorten to 10
+"""
+
+[assertions]
+initial_state = "After reset, state must be IDLE, then enter RED"
+cycle_duration = """
+- GREEN: lasts 60 cycles (or shortened to 10 if pass_request)
+- YELLOW: 5 cycles
+- RED: 10 cycles
+"""
+valid_transitions = """
+- IDLE → RED → GREEN → YELLOW → RED
+- No back-transitions or skips
+"""
+pedestrian_override = "If pass_request && green == 1 && cnt > 10, cnt is forced to 10"
+clock_output = "`clock` output always reflects value of internal `cnt`"
+
+[testbench]
+stimulus = """
+- Apply reset → observe transition through states
+- Assert pass_request during GREEN with cnt > 10 → check cnt shortens
+- Deassert pass_request → check normal 60-cycle GREEN behavior
+- Apply transitions for multiple cycles → confirm FSM sequence
+"""
+check = """
+- Correct duration of each phase (GREEN/RED/YELLOW)
+- Valid `clock` decrementing behavior
+- Lights correspond correctly to `state` (red/yellow/green)
+- FSM transitions follow expected path
+"""

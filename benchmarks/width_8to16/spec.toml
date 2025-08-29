@@ -1,0 +1,53 @@
+[meta]
+name = "width_8to16"
+description = "8-bit to 16-bit data width converter with valid signal synchronization"
+author = "User"
+version = "1.0"
+
+[interface]
+clk = "input - Clock signal for all synchronous logic"
+rst_n = "input - Active-low reset"
+valid_in = "input - Indicates input data is valid"
+data_in = "input [7:0] - 8-bit input data"
+valid_out = "output reg - Indicates output data is valid (asserted when 2 valid inputs have arrived)"
+data_out = "output reg [15:0] - 16-bit output data, concatenated from two 8-bit inputs"
+
+[internal]
+data_lock = { width = 8, description = "Temporary buffer to store first 8-bit data" }
+flag = { width = 1, description = "Toggle flag used to pair two valid inputs" }
+
+[behavior]
+type = "data width expansion (input packing)"
+data_flow = """
+- On every valid_in, behavior alternates based on `flag`:
+  * If `flag == 0`: first 8-bit data is captured into data_lock.
+  * If `flag == 1`: second 8-bit data arrives → concatenate with data_lock → output data_out and assert valid_out.
+- `flag` toggles on every valid input to track packing state.
+"""
+data_alignment = "The first 8-bit data appears in the higher 8 bits of data_out, second in the lower 8 bits."
+
+[timing]
+clk_edge = "posedge"
+reset_behavior = "All internal registers (data_lock, flag, valid_out, data_out) reset to 0 on rst_n=0"
+valid_delay = "valid_out and data_out are generated in the cycle of the second valid input (i.e., latency = 1 cycle from first input)"
+data_latency = "Each 16-bit output is formed from two consecutive 8-bit inputs, output aligned with second input"
+
+[assertions]
+reset = "After reset (rst_n=0), data_out == 0 and valid_out == 0"
+toggle_flag = "flag toggles on each valid_in"
+valid_output = "valid_out == 1 only when second valid input arrives (flag == 1)"
+correct_concatenation = "data_out == {data_lock, data_in} when valid_out is high"
+
+[testbench]
+stimulus = """
+- Apply reset → verify all outputs cleared
+- Apply pairs of valid_in + data_in → check valid_out and data_out timing
+- Apply only a single valid_in → ensure no valid_out/assertion until next input arrives
+- Test multiple consecutive input pairs to confirm alternating packing
+"""
+check = """
+- Ensure data_out[15:8] holds first data, data_out[7:0] holds second
+- valid_out is asserted only when 2nd valid input arrives
+- No spurious output when valid_in is low
+- Flag toggles correctly every valid_in
+"""
