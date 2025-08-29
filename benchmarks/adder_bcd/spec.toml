@@ -1,0 +1,55 @@
+[meta]
+name = "adder_bcd"
+description = "4-bit BCD adder for decimal arithmetic. Adds two BCD digits (0–9) and a carry-in, outputs a corrected BCD sum and carry-out."
+version = "1.0"
+author = "User"
+
+[parameter]
+DATA_WIDTH = 4
+
+[interface]
+A    = "input [3:0] - First BCD operand (0–9)"
+B    = "input [3:0] - Second BCD operand (0–9)"
+Cin  = "input - Carry-in bit"
+Sum  = "output [3:0] - Corrected BCD sum (0–9)"
+Cout = "output - Carry-out bit"
+
+[internal]
+temp_sum      = "wire [4:0] - Temporary binary sum of A, B, Cin"
+corrected_sum = "wire [3:0] - Corrected BCD sum after adjustment"
+carry_out     = "wire - Carry signal when temp_sum > 9"
+
+[operation]
+trigger = "combinational (always active via continuous assignments)"
+behavior = """
+1. Perform binary addition:
+   temp_sum = A + B + Cin
+2. Check correction condition:
+   - If temp_sum > 9:
+       carry_out = 1
+       corrected_sum = temp_sum + 6 (BCD correction)
+   - Else:
+       carry_out = 0
+       corrected_sum = temp_sum
+3. Assign outputs:
+   Sum = corrected_sum[3:0]
+   Cout = carry_out
+"""
+
+[assumptions]
+valid_inputs = "Inputs A and B must each be valid BCD digits (0–9)."
+correction_rule = "BCD correction of +6 ensures valid digit encoding."
+
+[assertions]
+carry_rule = "If (A+B+Cin) > 9 then Cout=1"
+sum_range  = "Sum is always within 0–9 after correction"
+no_overflow = "Only a single decimal carry is generated"
+
+[testbench]
+stimulus = """
+- Apply all valid BCD pairs (A=0–9, B=0–9) with Cin=0 and Cin=1
+"""
+expected = """
+- For sums <=9: Sum = A+B+Cin, Cout=0
+- For sums >9: Sum = (A+B+Cin) - 10, Cout=1
+"""

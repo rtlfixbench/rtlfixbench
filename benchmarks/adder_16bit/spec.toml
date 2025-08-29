@@ -1,0 +1,57 @@
+[meta]
+name = "adder_16bit"
+description = "Hierarchical 16-bit combinational adder composed of add8, add4, add2, and add1 submodules"
+author = "User"
+version = "1.0"
+
+[interface]
+a = "input [15:0] - 16-bit input operand A"
+b = "input [15:0] - 16-bit input operand B"
+Cin = "input - single-bit carry-in"
+y = "output [15:0] - 16-bit sum of a + b + Cin"
+Co = "output - final carry-out bit"
+
+[behavior]
+type = "combinational"
+description = """
+The `adder_16bit` module implements a 16-bit ripple-carry adder using a hierarchical design.
+It consists of two cascaded 8-bit adders (`add8`), each of which recursively invokes 4-bit (`add4`), 2-bit (`add2`), and bitwise full adders (`add1`).
+Each submodule propagates carry from lower bits to higher bits using intermediate `Co_temp` wires.
+"""
+
+[internal]
+Co_temp = { width = 1, description = "Intermediate carry wire between lower and upper 8-bit adders" }
+
+[submodules]
+add8 = """
+Submodule for 8-bit addition.
+Invokes two `add4` instances to handle upper and lower nibbles.
+"""
+add4 = """
+Submodule for 4-bit addition.
+Built from two 2-bit adders (`add2`), each with hierarchical carry propagation.
+"""
+add2 = """
+Submodule for 2-bit addition.
+Constructed using two bitwise full adders (`add1`) in series.
+"""
+add1 = """
+Bit-level full adder.
+Implements exact logic expressions (sum and carry-out) using SOP (sum-of-product) combinational logic.
+"""
+
+[assertions]
+carry_chain_correctness = "Each submodule's Co output is connected to the Cin input of the next-higher module or final output"
+sum_correctness = "y == (a + b + Cin)[15:0]"
+carry_out_correctness = "Co == (a + b + Cin)[16]"
+
+[testbench]
+stimulus = """
+- Sweep: (a, b) from 0 to 0xFFFF in stride, with Cin = 0 and 1
+- Edge cases: all-zeros, all-ones, alternating patterns, carry-chains (e.g., 0xFFFF + 0x0001)
+"""
+check = """
+Compare {y, Co} against golden reference (a + b + Cin) using behavioral model or reference adder.
+Ensure no latch inference and full combinational behavior.
+Verify carry propagation across all levels.
+"""

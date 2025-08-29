@@ -1,0 +1,72 @@
+[meta]
+name = "adder_32bit"
+description = "Hierarchical 32-bit carry-lookahead adder using modular CLA_16, adder_4, CLA, and bit-level adder structures"
+author = "User"
+version = "1.0"
+
+[interface]
+A = "input [32:1] - 32-bit input operand A"
+B = "input [32:1] - 32-bit input operand B"
+S = "output [32:1] - 32-bit sum output"
+C32 = "output - final carry-out"
+
+[behavior]
+type = "combinational"
+description = """
+This design implements a 32-bit carry-lookahead adder using a hierarchical structure.
+The `adder_32bit` module instantiates two `CLA_16` modules, which further divide into `adder_4` blocks.
+Each `adder_4` uses a dedicated `CLA` module for fast carry propagation, and bit-level `adder` cells to compute final outputs.
+Group propagate (`Pm`) and generate (`Gm`) signals are computed to allow fast carry-out computation between blocks.
+Carry-in (c0) is set to 0 at the top level.
+"""
+
+[internal]
+px1 = { width = 1, description = "Group propagate from lower 16-bit CLA_16 block" }
+gx1 = { width = 1, description = "Group generate from lower 16-bit CLA_16 block" }
+px2 = { width = 1, description = "Group propagate from upper 16-bit CLA_16 block" }
+gx2 = { width = 1, description = "Group generate from upper 16-bit CLA_16 block" }
+c16 = { width = 1, description = "Carry between CLA_16 blocks (from bit 16 to bit 17)" }
+
+[submodules]
+CLA_16 = """
+Each `CLA_16` handles 16-bit addition using 4x `adder_4` instances.
+Each `adder_4` computes its own sum and Pm/Gm.
+CLA logic computes internal carry signals c4, c8, c12, and final group px/gx.
+"""
+
+adder_4 = """
+Performs 4-bit addition using 4x `adder` modules and a `CLA` for fast carry propagation.
+Provides group Pm (propagate) and Gm (generate) outputs.
+"""
+
+CLA = """
+Dedicated carry lookahead logic for 4-bit group:
+Computes c1–c4 from p1–p4, g1–g4, and input carry-in c0.
+Optimizes carry generation across 4 bits.
+"""
+
+adder = """
+Bitwise full adder:
+Implements sum F = X ^ Y ^ Cin, and Cout = XY + (X⊕Y)Cin.
+No sequential logic; fully combinational.
+"""
+
+[assertions]
+group_propagate_generate_correctness = "For each CLA_16: gx and px correctly reflect internal carry behavior across all 16 bits"
+carry_chain_correctness = "c16 and C32 are correctly computed from gx/px using CLA formula"
+sum_correctness = "S == (A + B)[32:1] under c0 = 0"
+final_carry = "C32 == (A + B)[33]"
+
+[testbench]
+stimulus = """
+- Test cases covering:
+  - Zero inputs: A = 0, B = 0
+  - Max inputs: A = 0xFFFFFFFF, B = 0x00000001
+  - Alternating bit patterns (e.g. A = 0xAAAA..., B = 0x5555...)
+  - Randomized vectors
+"""
+check = """
+- Compare output (S, C32) to reference behavioral model: {S, C32} = A + B
+- Ensure carry chain correctness between CLA_16 and CLA blocks
+- Use assertion-based checkers on propagate/generate chains
+"""

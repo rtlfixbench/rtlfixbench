@@ -1,0 +1,51 @@
+[meta]
+name = "adder_8bit"
+description = "8-bit ripple-carry adder constructed using chained full adders."
+author = "User"
+version = "1.0"
+
+[interface]
+a = "input [7:0] - 8-bit input operand A"
+b = "input [7:0] - 8-bit input operand B"
+cin = "input - single-bit carry-in"
+sum = "output [7:0] - 8-bit output sum of a + b + cin"
+cout = "output - final carry-out bit"
+
+[behavior]
+type = "combinational"
+description = """
+This module implements an 8-bit ripple-carry adder using a chain of full adders (FA0–FA7).
+Each full adder computes one sum bit and propagates a carry to the next stage.
+The final carry-out is produced from the MSB stage.
+No clock or sequential element is used—entire operation is purely combinational.
+"""
+
+[internal]
+c = { width = 9, description = "Chained carry signals between full adders. c[0] is first stage carry-out, c[7] is final stage carry-out." }
+FA0 = "full_adder for bit 0: sum[0], carry to c[0]"
+FA1 = "full_adder for bit 1: sum[1], carry to c[1]"
+FA2 = "full_adder for bit 2: sum[2], carry to c[2]"
+FA3 = "full_adder for bit 3: sum[3], carry to c[3]"
+FA4 = "full_adder for bit 4: sum[4], carry to c[4]"
+FA5 = "full_adder for bit 5: sum[5], carry to c[5]"
+FA6 = "full_adder for bit 6: sum[6], carry to c[6]"
+FA7 = "full_adder for bit 7: sum[7], carry to c[7]"
+
+[assertions]
+carry_chain_correctness = "Each full_adder's carry-out feeds into the next stage's carry-in."
+sum_correctness = "sum == (a + b + cin)[7:0]"
+cout_correctness = "cout == (a + b + cin)[8]"
+
+[testbench]
+stimulus = """
+Provide combinations of a, b, and cin including:
+- All-zero inputs
+- All-one inputs
+- Alternating bit patterns
+- Overflowing additions (e.g., 0xFF + 0x01)
+"""
+check = """
+Compare module output {sum, cout} with golden reference: {a + b + cin}.
+Use assertions to verify sum bits and carry-out are correct.
+Ensure combinational behavior (no latches or memory).
+"""

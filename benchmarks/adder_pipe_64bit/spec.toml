@@ -1,0 +1,91 @@
+[meta]
+name = "adder_pipe_64bit"
+description = "A 64-bit pipelined ripple-carry adder with 4 pipeline stages and output valid signal"
+
+[interface]
+clk = "input - clock signal"
+rst_n = "input - active-low reset signal"
+i_en = "input - enable signal to trigger new addition"
+adda = "input [63:0] - 64-bit operand A"
+addb = "input [63:0] - 64-bit operand B"
+result = "output [64:0] - 65-bit sum output of adda + addb"
+o_en = "output - output enable signal, indicates when result is valid"
+
+[behavior]
+type = "sequential (pipelined)"
+description = """
+The module implements a pipelined 64-bit ripple-carry adder using four 16-bit stages.
+Each pipeline stage computes a 16-bit partial sum and propagates carry to the next stage.
+Stages are separated by clocked registers to enable high-speed operation.
+Input enable signal `i_en` is passed through pipeline registers (stage1, stage2, stage3) and used to drive `o_en`.
+Carry propagation is strictly synchronous.
+The final result is concatenated from all 4 stage sums and the final carry-out bit.
+"""
+
+[internal]
+
+# Pipeline stage control
+stage1 = { width = 1, description = "Pipeline stage 1 valid flag (delayed i_en)" }
+stage2 = { width = 1, description = "Pipeline stage 2 valid flag" }
+stage3 = { width = 1, description = "Pipeline stage 3 valid flag" }
+
+# Sub-operand partitions
+a1 = "lower 16 bits of operand A"
+b1 = "lower 16 bits of operand B"
+a2 = "bits 31:16 of operand A"
+b2 = "bits 31:16 of operand B"
+a3 = "bits 47:32 of operand A"
+b3 = "bits 47:32 of operand B"
+a4 = "bits 63:48 of operand A"
+b4 = "bits 63:48 of operand B"
+
+# Data registers (multi-stage delay for pipeline sync)
+a2_ff1 = "delayed a2 for stage 2"
+b2_ff1 = "delayed b2 for stage 2"
+a3_ff1 = "delayed a3 stage 1"
+a3_ff2 = "delayed a3 stage 2"
+b3_ff1 = "same as above for b3"
+b3_ff2 = "same as above for b3"
+a4_ff1 = "a4 stage 1 delay"
+a4_ff2 = "a4 stage 2 delay"
+a4_ff3 = "a4 stage 3 delay"
+b4_ff1 = "b4 stage 1 delay"
+b4_ff2 = "b4 stage 2 delay"
+b4_ff3 = "b4 stage 3 delay"
+
+# Carry and Sum Registers
+c1 = { width = 1, description = "Carry from stage 1 → stage 2" }
+c2 = { width = 1, description = "Carry from stage 2 → stage 3" }
+c3 = { width = 1, description = "Carry from stage 3 → stage 4" }
+c4 = { width = 1, description = "Final carry-out" }
+
+s1 = { width = 16, description = "Sum from stage 1" }
+s2 = { width = 16, description = "Sum from stage 2" }
+s3 = { width = 16, description = "Sum from stage 3" }
+s4 = { width = 16, description = "Sum from stage 4" }
+
+# Sum delay chain
+s1_ff1 = "s1 delayed 1 stage"
+s1_ff2 = "s1 delayed 2 stages"
+s1_ff3 = "s1 delayed 3 stages"
+s2_ff1 = "s2 delayed 1 stage"
+s2_ff2 = "s2 delayed 2 stages"
+s3_ff1 = "s3 delayed 1 stage"
+
+[assertions]
+reset_behavior = "On rst_n = 0, all stages and carry/sum registers should reset to 0"
+enable_pipeline_sync = "i_en propagates through stage1 → stage3 → o_en, controlling computation enable"
+sum_correctness = "result == adda + addb after 4 pipeline cycles"
+carry_propagation_correctness = "Carry from lower stage is correctly propagated to next stage synchronously"
+
+[testbench]
+stimulus = """
+- Apply i_en with known adda, addb values
+- Vary timing and values across multiple cycles to test pipeline alignment
+- Reset mid-computation to verify pipeline clears
+"""
+check = """
+- After 4 cycles, check o_en is high and result equals expected adda + addb
+- Assert that pipeline registers delay sums/carries correctly
+- Check corner cases: zero input, max input, carry overflow (e.g. 64'hFFFFFFFFFFFFFFFF + 1)
+"""
