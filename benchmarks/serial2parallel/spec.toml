@@ -1,0 +1,64 @@
+[meta]
+name = "serial2parallel"
+description = "8-bit serial-to-parallel converter with valid handshake output"
+author = "User"
+version = "1.0"
+
+[parameter]
+WIDTH = 8  # Serial to parallel width (fixed at 8 bits)
+
+[interface]
+clk = "input - Clock signal for synchronous logic"
+rst_n = "input - Active-low reset signal"
+din_serial = "input - 1-bit serial data input"
+din_valid = "input - 1-bit data valid signal indicating that din_serial is valid"
+dout_parallel = "output reg [7:0] - 8-bit parallel output after full serial accumulation"
+dout_valid = "output reg - 1-bit valid output flag, asserted when dout_parallel is valid"
+
+[behavior]
+type = "sequential"
+description = """
+This module collects 8 serial input bits (`din_serial`), one per clock cycle when `din_valid` is high, and assembles them into an 8-bit word (`dout_parallel`), MSB first.
+- A 4-bit counter (`cnt`) tracks the number of valid serial bits received.
+- Serial bits are shifted left into `din_tmp` on each `din_valid` pulse.
+- When `cnt` reaches 8, `dout_valid` is asserted for 1 cycle, and the assembled data is driven on `dout_parallel`.
+- If `din_valid` is low or reset is asserted, counter resets.
+"""
+
+[internal]
+din_tmp = { width = 8, description = "Shift register holding intermediate serial input bits" }
+cnt = { width = 4, description = "Counter indicating how many serial bits have been received" }
+
+[algorithm]
+steps = """
+1. Wait for `rst_n == 1` and `din_valid == 1`
+2. On each `clk`:
+   - If `cnt < 8`, shift `din_serial` into `din_tmp` from LSB side (MSB-first loading)
+   - Increment `cnt`
+3. When `cnt == 8`, transfer `din_tmp` to `dout_parallel` and assert `dout_valid = 1`
+4. On next cycle, reset `cnt` and `dout_valid = 0`
+"""
+
+[timing]
+clk_edge = "posedge"
+reset_behavior = "All registers (cnt, din_tmp, dout_parallel, dout_valid) reset to 0 when rst_n == 0"
+valid_condition = "dout_valid is asserted exactly when 8 bits have been received"
+
+[assertions]
+input_valid = "`din_valid` must remain high for at least 8 consecutive cycles to produce valid output"
+output_valid_flag = "`dout_valid` should only be high for 1 clock cycle after receiving 8 serial bits"
+bit_ordering = "First received bit enters MSB position; later bits shift toward LSB"
+
+[testbench]
+stimulus = """
+- Serial pattern: 8'hA5 = 10100101, sent bit by bit with din_valid=1
+- Test with: 
+  * din_valid = 1 for exactly 8 cycles → Expect dout_parallel = 8'b10100101, dout_valid = 1
+  * din_valid toggling (0→1→0): Check correct reset behavior
+  * Consecutive frames: 16 bits input (two valid outputs)
+"""
+check = """
+- Verify correct timing of dout_valid assertion
+- Check correct MSB-to-LSB mapping of serial bits
+- Confirm reset clears internal states
+"""

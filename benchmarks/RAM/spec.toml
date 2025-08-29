@@ -1,0 +1,63 @@
+[meta]
+name = "RAM"
+description = "Dual-port synchronous RAM (8-depth, 6-bit width) supporting simultaneous read/write operations. All locations initialized to 000000 on reset."
+version = "1.0"
+author = "User"
+
+[parameter]
+WIDTH = 6
+DEPTH = 8
+
+[interface]
+clk         = "input - Clock signal for synchronous read/write"
+rst_n       = "input - Active-low reset signal"
+write_en    = "input - Enables write to RAM"
+write_addr  = "input [7:0] - Address to write to"
+write_data  = "input [5:0] - Data to write"
+read_en     = "input - Enables read from RAM"
+read_addr   = "input [7:0] - Address to read from"
+read_data   = "output reg [5:0] - Data read from RAM"
+
+[ram_spec]
+type        = "dual-port synchronous RAM"
+width       = 6
+depth       = 8
+init_value  = "all zero (000000)"
+implementation_note = "Verilog 'reg [5:0] RAM [0:7]' emulated via behavioral modeling; both read and write are registered."
+
+[write_operation]
+trigger     = "posedge clk or negedge rst_n"
+reset_behavior = "RAM[0..7] <= 0 when rst_n == 0"
+enable_condition = "write_en == 1"
+action      = "RAM[write_addr] <= write_data"
+
+[read_operation]
+trigger     = "posedge clk or negedge rst_n"
+reset_behavior = "read_data <= 0 when rst_n == 0"
+enable_condition = "read_en == 1"
+action      = "read_data <= RAM[read_addr]"
+fallback    = "read_data <= 0 if read_en == 0"
+
+[conflicts]
+simultaneous_access = "Reads and writes can occur concurrently; addressed resolved independently."
+
+[assertions]
+reset_initialization = "After reset, all RAM[i] == 0 and read_data == 0"
+write_functionality = "If write_en==1, RAM[write_addr] is updated on clk"
+read_functionality  = "If read_en==1, read_data is updated with RAM[read_addr] on clk"
+read_default_zero   = "If read_en==0, read_data is cleared to 0"
+no_read_write_collision = "Read and write can operate on different addresses simultaneously without conflict"
+
+[testbench]
+stimulus = """
+- Apply reset: rst_n = 0 → 1
+- Write sequence: write_en=1, write_addr=0..7, write_data=6'hAA
+- Read sequence: read_en=1, read_addr=0..7
+- Read and write same cycle to different addresses to verify dual-port operation
+"""
+expected = """
+- After reset, all RAM contents are 0
+- Written values are correctly stored and read back
+- Output is 0 if read_en==0
+- Read/write do not interfere on different addresses
+"""

@@ -1,0 +1,54 @@
+[meta]
+name = "sequence_detector"
+description = "Mealy/Moore-style FSM that detects the 4-bit sequence 1001 on a serial input stream."
+version = "1.0"
+author = "User"
+
+[interface]
+clk               = "input  - Clock"
+reset_n           = "input  - Active-low reset"
+data_in           = "input  - Serial bitstream"
+sequence_detected = "output - High for one cycle when sequence 1001 is observed"
+
+[states]
+IDLE = "Waiting for start bit '1'."
+S1   = "Saw '1' (first bit of 1001)."
+S2   = "Saw '10' (first two bits matched)."
+S3   = "Saw '100' (first three bits matched)."
+S4   = "Saw '1001' (full sequence matched); assert sequence_detected."
+
+[behavior]
+type = "Synchronous FSM (state register on posedge clk, async active-low reset)"
+transitions = """
+IDLE --(1)--> S1        ; IDLE --(0)--> IDLE
+S1   --(0)--> S2        ; S1   --(1)--> S1
+S2   --(0)--> S3        ; S2   --(1)--> S1
+S3   --(1)--> S4        ; S3   --(0)--> IDLE
+S4   --(1)--> S1        ; S4   --(0)--> S2
+"""
+output_rule = "sequence_detected = 1 when curr_state == S4 (one-cycle pulse)."
+overlap = "Overlapping sequences supported (e.g., input 1001001 produces two detections)."
+
+[reset]
+assertion = "When reset_n==0, curr_state := IDLE, sequence_detected := 0."
+
+[assumptions]
+sampling = "data_in is sampled on posedge clk."
+latency  = "sequence_detected goes high on the cycle after the 4th bit of 1001 is sampled."
+
+[assertions]
+idle_reset      = "After deasserting reset_n, FSM starts from IDLE."
+one_hot_detect  = "sequence_detected asserted only when full pattern matched."
+overlap_support = "Back-to-back/overlapping patterns are detected (e.g., 1001001)."
+
+[testbench]
+stimulus = """
+1) Reset: reset_n=0 → 1, drive clk.
+2) Feed stream: 1 0 0 1 → expect sequence_detected pulse on 4th bit.
+3) Overlap: 1 0 0 1 0 0 1 → expect pulses on 4th and 7th bits.
+4) Non-match noise: random bits not forming 1001 → no pulses.
+"""
+expected = """
+- sequence_detected is a single-cycle high when the 4th bit of 1001 is captured.
+- FSM correctly returns to appropriate state to support overlapping detection.
+"""

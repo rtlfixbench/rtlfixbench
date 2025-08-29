@@ -1,0 +1,4 @@
+time,clk_a,clk_b,arstn,brstn,data_in,data_en,dataout_expected
+185,1,0,1,1,4,1,4
+435,1,1,1,1,7,1,7
+895,1,1,1,1,9,1,9

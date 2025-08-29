@@ -1,0 +1,102 @@
+[meta]
+name = "radix2_div"
+description = "8-bit signed radix-2 sequential divider with valid-ready handshake and remainder-quotient result output"
+author = "User"
+version = "1.0"
+
+[parameter]
+DATAWIDTH = "Input bit width for dividend and divisor (default: 8 bits)"
+
+[interface]
+clk = "input - Clock signal for synchronous operation"
+rst = "input - Active-high reset signal"
+dividend = "input [DATAWIDTH-1:0] - Dividend input operand"
+divisor = "input [DATAWIDTH-1:0] - Divisor input operand"
+sign = "input - 1 if signed division is desired, 0 if unsigned"
+opn_valid = "input - Input valid signal to initiate division"
+res_ready = "input - Output ready handshake from downstream"
+res_valid = "output reg - Output valid signal when result is ready"
+result = "output [2×DATAWIDTH-1:0] - Concatenated remainder and quotient: {remainder, quotient}"
+
+[behavior]
+type = "sequential (pipelined FSM-like, no explicit states)"
+description = """
+The module performs a signed or unsigned division between two 8-bit operands using the Radix-2 shift-subtract algorithm.
+The result is 16-bit: [15:8] is the remainder, [7:0] is the quotient.
+A handshake protocol is used:
+- `opn_valid` initiates division
+- `res_valid` signals result is ready
+- `res_ready` clears the result latch
+
+The division is performed over multiple clock cycles:
+- The dividend is extended into a 16-bit shift register (SR)
+- The divisor is extended to 9 bits and 2’s-complemented for subtraction
+- At each cycle:
+    - Shift SR left
+    - Subtract divisor if possible
+    - Accumulate quotient
+- After 8 iterations, the division is complete and `res_valid` is asserted
+- Remainder and quotient are corrected based on signed division rules
+"""
+
+[internal]
+dividend_save = { width = 8, description = "Latched dividend for sign correction" }
+divisor_save = { width = 8, description = "Latched divisor for sign correction" }
+SR = { width = 16, description = "Shift register: {remainder[15:8], quotient[7:0]}" }
+NEG_DIVISOR = { width = 9, description = "2’s-complemented divisor for subtraction" }
+cnt = { width = 4, description = "Cycle counter, counts from 0 to 8" }
+start_cnt = { width = 1, description = "Division in-progress flag" }
+remainer = { width = 8, description = "Final corrected remainder" }
+quotient = { width = 8, description = "Final corrected quotient" }
+
+[algorithm]
+steps = """
+1. On reset, all internal registers are cleared
+2. When `opn_valid && !res_valid`:
+   - Latch dividend and divisor
+   - Initialize SR = {7'b0, |dividend|, 1'b0}
+   - Compute NEG_DIVISOR = sign ? twos_complement(divisor) : -divisor
+   - Set start_cnt = 1
+3. While start_cnt:
+   - For 8 cycles:
+     - Left shift SR
+     - Attempt subtraction using NEG_DIVISOR
+     - If successful, set quotient bit = 1
+     - Else, leave SR unchanged
+4. After 8 cycles:
+   - Update SR remainder and quotient
+   - Apply sign correction if needed
+   - Assert `res_valid`
+5. On `res_ready`, clear `res_valid`
+"""
+
+[handshake]
+protocol = "valid-ready"
+init = "opn_valid starts computation when res_valid == 0"
+ready = "res_ready clears output result and allows next operation"
+
+[assertions]
+reset_behavior = "All registers and state cleared on rst"
+output_valid = "res_valid asserted exactly when division completes"
+signed_division = """
+If `sign == 1`, quotient and remainder are sign-extended and corrected based on:
+- Quotient: sign(a) ^ sign(b)
+- Remainder: sign(a)
+"""
+division_correctness = "result = {remainder, quotient} == dividend / divisor (signed or unsigned based on `sign`)"
+
+[testbench]
+stimulus = """
+- Unsigned: a=20, b=3 → q=6, r=2
+- Signed: a=-20, b=3 → q=-6, r=-2
+- Signed: a=20, b=-3 → q=-6, r=2
+- Signed: a=-20, b=-3 → q=6, r=-2
+- a=0, b≠0 → q=0, r=0
+- b=0 → divide-by-zero (optional behavior)
+"""
+check = """
+- Confirm result is valid only after 8 cycles
+- Validate sign correction of quotient and remainder
+- Assert res_valid high only one cycle, cleared by res_ready
+- Monitor SR shift and sub logic via waveform or assertion
+"""

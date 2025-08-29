@@ -1,0 +1,61 @@
+[meta]
+name = "signal_generator"
+description = "5-bit triangle wave signal generator. Generates a waveform cycling between 0 and 31 by incrementing and decrementing."
+
+[parameter]
+WIDTH = 5
+MAX_VALUE = 31
+MIN_VALUE = 0
+
+[interface]
+clk  = "input - Clock signal for synchronous operation"
+rst_n = "input - Active-low reset signal"
+wave = "output reg [4:0] - 5-bit waveform output"
+
+[internal]
+state = "reg [1:0] - FSM state register controlling increment or decrement"
+
+[initialization]
+state = "0 on reset"
+wave  = "0 on reset"
+
+[operation]
+trigger = "posedge clk or negedge rst_n"
+behavior = """
+- On reset (~rst_n):
+  state <= 0
+  wave <= 0
+
+- If state == 0 (incrementing mode):
+  wave <= wave + 1
+  If wave == 31 -> state transitions to 1
+
+- If state == 1 (decrementing mode):
+  wave <= wave - 1
+  If wave == 0 -> state transitions back to 0
+"""
+
+[waveform]
+type = "triangle wave"
+range = "0 to 31 (5-bit)"
+step = "±1 per clock cycle"
+cycle = "Wave increments up to 31, then decrements down to 0, repeats continuously"
+
+[assertions]
+reset_behavior = "On reset, wave == 0 and state == 0"
+increment_behavior = "When state=0 and wave<31, wave increases by 1 each cycle"
+decrement_behavior = "When state=1 and wave>0, wave decreases by 1 each cycle"
+state_transition = "When wave==31, state changes 0->1; when wave==0, state changes 1->0"
+
+[testbench]
+stimulus = """
+- Apply reset (rst_n=0 -> 1)
+- Provide clk pulses
+- Observe wave output
+"""
+expected = """
+- Wave starts at 0
+- Increments to 31
+- Decrements to 0
+- Repeats triangle waveform cycle
+"""

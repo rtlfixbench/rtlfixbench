@@ -1,0 +1,48 @@
+[meta]
+name = "right_shifter"
+description = "8-bit right shifter with serial input. On each clock edge, the register shifts right and inserts a new bit into the MSB."
+version = "1.0"
+author = "User"
+
+[parameter]
+WIDTH = 8
+
+[interface]
+clk = "input - Clock signal for synchronous operation"
+d   = "input - 1-bit serial data input"
+q   = "output reg [7:0] - 8-bit register output after right shift"
+
+[initialization]
+q = "All bits initialized to 0 via initial block"
+
+[operation]
+trigger = "posedge clk"
+behavior = """
+On each rising edge of clk:
+1. Shift register q right by 1 bit (q[6:0] <= q[7:1]).
+2. Insert new input bit d into MSB (q[7]).
+Effectively: q_next = {d, q[7:1]}
+"""
+
+[implementation_note]
+note = "Original implementation used q <= (q >> 1) and q[7] <= d in sequence; recommended to simplify as q <= {d, q[7:1]} to avoid synthesis ambiguity."
+
+[assertions]
+reset_initialization = "At time 0, q == 8'b00000000"
+shift_correctness    = "After n clock cycles, q contains the last n inputs shifted in MSB-first order"
+serial_load          = "If d sequence is 1,0,1,0,1,0,1,0, then after 8 cycles q == 8'b10101010"
+
+[testbench]
+stimulus = """
+- Apply clk toggling
+- Initialize q=0
+- Feed input sequence: d=1,0,1,0,1,0,1,0 across 8 cycles
+"""
+expected = """
+- q evolves as:
+  Cycle 1: 10000000
+  Cycle 2: 01000000
+  Cycle 3: 10100000
+  ...
+  Cycle 8: 10101010
+"""

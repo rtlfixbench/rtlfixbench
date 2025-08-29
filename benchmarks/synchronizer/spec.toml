@@ -1,0 +1,63 @@
+[meta]
+name = "synchronizer"
+description = "4-bit multi-bit MUX-based synchronizer. Data input (data_in) and enable signal (data_en) are sampled in clk_a domain, synchronized to clk_b domain with two flip-flops, and output as dataout."
+version = "1.0"
+author = "User"
+
+[parameter]
+DATA_WIDTH = 4
+
+[interface]
+clk_a   = "input - Clock signal A for data_in and data_en domain"
+clk_b   = "input - Clock signal B for synchronization domain"
+arstn   = "input - Active-low asynchronous reset for clk_a domain"
+brstn   = "input - Active-low asynchronous reset for clk_b domain"
+data_in = "input [3:0] - 4-bit input data, referenced to clk_a"
+data_en = "input - Enable signal, referenced to clk_a"
+dataout = "output reg [3:0] - 4-bit synchronized data output, referenced to clk_b"
+
+[internal]
+data_reg    = "Register in clk_a domain to hold data_in"
+en_data_reg = "Register in clk_a domain to hold data_en"
+en_clap_one = "First stage flip-flop of enable signal in clk_b domain"
+en_clap_two = "Second stage flip-flop of enable signal in clk_b domain"
+
+[initialization]
+arstn_behavior = "When arstn=0, data_reg and en_data_reg are reset to 0"
+brstn_behavior = "When brstn=0, en_clap_one, en_clap_two, and dataout are reset to 0"
+
+[operation]
+trigger = "posedge clk_a for data_in/data_en; posedge clk_b for synchronization"
+behavior = """
+1. In clk_a domain:
+   - data_reg <= data_in
+   - en_data_reg <= data_en
+2. In clk_b domain:
+   - en_clap_one <= en_data_reg
+   - en_clap_two <= en_clap_one
+   - if (en_clap_two == 1) then dataout <= data_reg
+   - else dataout holds its previous value
+"""
+
+[assumptions]
+data_stability = "data_in remains constant during data_en=1"
+data_en_width  = "data_en is asserted high for at least 3 clk_b cycles"
+data_change_interval = "Minimum 10 clk_b cycles between changes of data_in"
+
+[assertions]
+reset_correctness = "On arstn=0 or brstn=0, all registers are cleared"
+enable_propagation = "data_en is synchronized into clk_b domain via two flip-flops (en_clap_one, en_clap_two)"
+data_capture = "When en_clap_two=1, dataout matches data_reg from clk_a domain"
+
+[testbench]
+stimulus = """
+- Apply clk_a and clk_b at different frequencies
+- Toggle arstn and brstn
+- Provide sequences of data_in with data_en pulses high for >=3 clk_b cycles
+"""
+expected = """
+- data_reg samples data_in when data_en=1 in clk_a domain
+- en_data_reg propagates into clk_b via two-stage synchronizer
+- dataout updates in clk_b domain when en_clap_two=1
+- dataout remains stable otherwise
+"""

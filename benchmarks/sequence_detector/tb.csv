@@ -1,0 +1,4 @@
+time,clk,rst_n,data_in,sequence_detected
+58,1,1,1,1
+78,1,1,0,0
+108,1,1,1,1

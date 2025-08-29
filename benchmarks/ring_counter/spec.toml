@@ -1,0 +1,38 @@
+[meta]
+name = "ring_counter"
+description = "An 8-bit ring counter where a single '1' cycles through the 8-bit output register."
+version = "1.0"
+author = "User"
+
+[interface]
+clk   = "input  - Clock signal driving state transitions"
+reset = "input  - Active-high reset signal to initialize the counter"
+out   = "output - 8-bit one-hot encoded state, with a single bit high"
+
+[behavior]
+initialization = "On reset, state is initialized to 8'b0000_0001 (LSB set)."
+transition     = "On each posedge clk, state <= {state[6:0], state[7]}, causing the '1' to rotate left."
+cycling        = "The '1' circulates through all 8 positions, repeating cyclically."
+output_rule    = "out mirrors the internal state register."
+
+[reset]
+assertion = "When reset==1, state is forced to 8'b0000_0001, independent of clk."
+
+[properties]
+one_hot       = "At any given time, only one bit of out is set to 1."
+cycle_length  = "The counter completes a full cycle in 8 clock cycles."
+wraparound    = "After MSB (out=1000_0000), the next state returns to LSB (0000_0001)."
+
+[testbench]
+stimulus = """
+1) Apply reset=1, then release → expect out=0000_0001.
+2) Drive clk for 8 cycles → expect output sequence:
+   0000_0001, 0000_0010, 0000_0100, 0000_1000,
+   0001_0000, 0010_0000, 0100_0000, 1000_0000, then back to 0000_0001.
+3) Assert reset during operation → expect immediate reset to 0000_0001.
+"""
+expected = """
+- out always contains exactly one '1'.
+- Sequence cycles every 8 clock pulses.
+- Reset reliably reinitializes to 0000_0001.
+"""

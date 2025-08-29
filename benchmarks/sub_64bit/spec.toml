@@ -1,0 +1,52 @@
+[meta]
+name = "sub_64bit"
+description = "64-bit subtractor with overflow detection for signed high-precision arithmetic operations."
+version = "1.0"
+author = "User"
+
+[parameter]
+DATA_WIDTH = 64
+
+[interface]
+A        = "input [63:0] - First operand (signed integer)"
+B        = "input [63:0] - Second operand (signed integer to be subtracted)"
+result   = "output [63:0] - Result of subtraction (A - B)"
+overflow = "output - Overflow flag (1 if overflow occurs, else 0)"
+
+[internal]
+sign_A     = "bit A[63] - Sign of operand A"
+sign_B     = "bit B[63] - Sign of operand B"
+sign_result= "bit result[63] - Sign of subtraction result"
+
+[operation]
+trigger = "combinational (always @(*))"
+behavior = """
+1. Compute raw subtraction:
+   result = A - B
+2. Detect overflow:
+   - Overflow occurs when (sign_A != sign_B) AND (sign_result != sign_A).
+     * Positive overflow: A is positive, B is negative, but result is negative.
+     * Negative overflow: A is negative, B is positive, but result is positive.
+3. Assign overflow flag:
+   - overflow = 1 if overflow condition holds.
+   - overflow = 0 otherwise.
+"""
+
+[assumptions]
+signed_mode = "Operands are treated as signed two's complement 64-bit integers."
+wraparound_behavior = "If no overflow, result is valid two’s complement subtraction."
+
+[assertions]
+no_spurious_overflow = "If A[63]==B[63], overflow must always be 0."
+overflow_case = "If A is positive, B is negative, and result is negative, then overflow=1 (positive overflow). If A is negative, B is positive, and result is positive, then overflow=1 (negative overflow)."
+
+[testbench]
+stimulus = """
+- Case1: A=64'h0000_0000_0000_0001, B=64'h0000_0000_0000_0001 → result=0, overflow=0
+- Case2: A=64'h7FFF_FFFF_FFFF_FFFF, B=64'hFFFF_FFFF_FFFF_FFFF → Positive overflow expected
+- Case3: A=64'h8000_0000_0000_0000, B=64'h0000_0000_0000_0001 → Negative overflow expected
+"""
+expected = """
+- Verify result matches A-B in two’s complement.
+- Verify overflow matches sign check rules.
+"""
