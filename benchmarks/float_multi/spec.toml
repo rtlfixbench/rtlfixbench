@@ -1,0 +1,86 @@
+[meta]
+name = "float_multi"
+description = "IEEE-754 single-precision (32-bit) floating-point multiplier with multi-cycle pipeline, normalization, and round-to-nearest-even."
+version = "1.0"
+author = "User"
+
+[interface]
+clk = "input - Clock"
+rst = "input - Active-high reset"
+a   = "input  [31:0] - IEEE-754 single-precision operand A"
+b   = "input  [31:0] - IEEE-754 single-precision operand B"
+z   = "output reg [31:0] - IEEE-754 single-precision product"
+
+[encoding.ieee754_single]
+sign_bit      = 31
+exponent_bits = "30:23 (biased by 127)"
+mantissa_bits = "22:0 (implicit leading 1 for normalized numbers)"
+
+[internal_signals]
+counter      = "reg [2:0] - operation phase counter"
+a_sign       = "reg - sign(A)"
+b_sign       = "reg - sign(B)"
+z_sign       = "reg - sign(A) XOR sign(B)"
+a_exponent   = "reg [9:0] - unbiased exponent(A)"
+b_exponent   = "reg [9:0] - unbiased exponent(B)"
+z_exponent   = "reg [9:0] - intermediate unbiased exponent"
+a_mantissa   = "reg [23:0] - mantissa(A) with hidden bit when normalized"
+b_mantissa   = "reg [23:0] - mantissa(B) with hidden bit when normalized"
+z_mantissa   = "reg [23:0] - post-multiply/normalize mantissa"
+product      = "reg [49:0] - 24x24 product with headroom"
+guard_bit    = "reg - G"
+round_bit    = "reg - R"
+sticky       = "reg - S (OR of all lower product bits)"
+
+[behavior.pipeline]
+phase_001 = "Unpack A, B: extract sign, exponent (unbias by 127), mantissa; detect denormals (exp==0)"
+phase_010 = "Classify/handle specials: NaN, ±Inf, zeros; set hidden 1 for normals, adjust denormals to exp=-126"
+phase_011 = "Pre-normalize mantissas to ensure MSB=1 by left-shifting and decrementing exponent if needed"
+phase_100 = "Multiply mantissas (24x24), compute tentative exponent: z_exp = a_exp + b_exp + 1; z_sign = a^b"
+phase_101 = "Slice product to z_mantissa (bits 49:26); capture G=25, R=24, S=OR(23:0)"
+phase_110 = "Normalize/denormalize result; apply round-to-nearest-even using GRS; adjust exponent on carry"
+phase_111 = "Pack result: re-bias exponent (+127), write sign; handle underflow to subnormal/zero and overflow to ±Inf"
+
+[behavior.special_cases]
+nan = "If any operand is NaN (exp=255 and mantissa!=0) → z=quiet NaN"
+inf_mult = "±Inf × nonzero → ±Inf; 0 × ±Inf → NaN"
+zero = "If either operand is zero (exp=0 and mantissa=0) → signed zero"
+
+[normalization]
+denormal_inputs = "If exp==0 and mantissa!=0 → treat exponent as -126 without hidden 1; otherwise set hidden 1"
+post_product = "If z_mantissa[23]==0 then left shift and decrement exponent; if shift underflows below -126, create subnormal by right-shifting and tracking GRS"
+
+[rounding]
+mode = "Round to nearest, ties to even (uses Guard, Round, Sticky and LSB of mantissa)"
+rule = "If G && (R || S || LSB(mantissa)==1) then increment mantissa; if mantissa overflows, increment exponent"
+
+[packing]
+rebias = "Final exponent = z_exponent + 127"
+underflow = "If unbiased exp < -126 and cannot be represented as subnormal → flush to signed zero"
+overflow = "If unbiased exp > +127 → set ±Inf (mantissa=0, sign=z_sign)"
+
+[timing]
+synchronous = "All sequential updates on posedge clk"
+reset = "When rst=1, counter reset to 0; pipeline restarts"
+latency = "Up to 7 phases (counter 001..111) for a fully processed output"
+
+[assertions]
+ieee_quiet_nan = "NaN inputs propagate to a quiet NaN result"
+inf_zero_is_nan = "0 × Inf yields NaN per IEEE-754"
+round_nearest_even = "Ties (G==1, R==0, S==0) round to even mantissa LSB"
+denorm_handling = "Subnormal inputs treated with exponent -126 and no hidden bit"
+
+[testbench]
+stimulus = """
+- Normal × Normal: a=1.5 (0x3FC00000) × b=2.5 (0x40200000) → z=3.75 (0x40700000)
+- Subnormal × Normal
+- Zero × Any
+- Inf × Nonzero, 0 × Inf
+- NaN propagation
+- Rounding tie cases to verify nearest-even
+"""
+checks = """
+- Compare against a software IEEE-754 reference (e.g., Python/SoftFloat).
+- Verify correct GRS rounding, exponent re-biasing, and special-case handling.
+- Confirm overflow → ±Inf, underflow → subnormal/zero with correct sign.
+"""

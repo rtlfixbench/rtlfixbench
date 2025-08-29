@@ -1,0 +1,45 @@
+[meta]
+name = "LFSR"
+description = "4-bit Linear Feedback Shift Register for pseudo-random sequence generation"
+version = "1.0"
+author = "User"
+
+[parameters]
+WIDTH = "4   # Register width (number of bits in LFSR)"
+
+[interface]
+clk = "input        - Clock signal for synchronous shift"
+rst = "input        - Active-high reset signal, initializes register to zero"
+out = "output [3:0] - 4-bit output representing current state of the LFSR"
+
+[implementation]
+concept = """
+The LFSR (Linear Feedback Shift Register) generates pseudo-random sequences 
+using a shift register with feedback logic.
+Feedback is derived from XOR of specific taps (out[3] and out[2]) and then inverted.
+On each rising edge of clk:
+- If rst=1, register is reset to 0.
+- If rst=0, register shifts left and inserts feedback into LSB.
+"""
+behavior = """
+- Feedback = ~(out[3] ^ out[2])
+- out <= {out[2:0], feedback}
+- Produces a repeating pseudo-random sequence of length up to 2^WIDTH - 1 depending on taps.
+"""
+note = "Because reset initializes to all zeros, this state will lock the LFSR at zero until restarted."
+
+[corner_cases]
+reset = "When rst=1, output is set to 0000 regardless of prior state."
+lock_state = "If output is all zeros, LFSR will remain locked in zero state since feedback resolves to 1 but still cycles to zeros."
+max_sequence = "Pseudo-random sequence length may not reach full 15 states depending on tap selection."
+
+[testbench]
+stimulus = """
+1) rst=1 → out=0000
+2) rst=0, clk rising → shift and insert feedback
+3) Apply continuous clocks to observe pseudo-random sequence
+"""
+expected = """
+- After reset deassertion, sequence starts shifting with feedback logic.
+- Out evolves as a pseudo-random bitstream until repeating.
+"""

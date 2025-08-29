@@ -1,0 +1,87 @@
+[meta]
+name = "fixed_point_adder"
+description = "Parameterized fixed-point adder (signed Q-format) performing add/sub by sign/abs comparison."
+version = "1.0"
+author = "User"
+
+[parameters]
+# Total width N, with sign bit at [N-1]; Q fractional bits => integer bits = N-1-Q
+Q = "Number of fractional bits (precision), e.g., 15"
+N = "Total data width in bits, e.g., 32"
+
+[interface]
+a = "input  [N-1:0] - First fixed-point operand in signed two's complement Q-format"
+b = "input  [N-1:0] - Second fixed-point operand in signed two's complement Q-format"
+c = "output [N-1:0] - Result in the same Q-format"
+
+[internal]
+res = "reg [N-1:0] - Holds intermediate result of add/sub (assigned to output c)"
+
+[encoding]
+format = "Signed two's complement fixed point"
+sign_bit = "Bit [N-1]"
+fractional_bits = "Q"
+integer_bits = "N-1-Q (including sign magnitude, excluding sign bit)"
+
+[behavior]
+type = "Combinational"
+rules = """
+1) Same-sign add (|a| + |b|):
+   - If a[N-1] == b[N-1], add magnitudes:
+       res[N-2:0] = a[N-2:0] + b[N-2:0]
+       res[N-1]   = a[N-1]   // sign preserved
+2) Different-sign subtract (|larger| - |smaller|):
+   - If a[N-1]==0 && b[N-1]==1:
+       if a[N-2:0] > b[N-2:0]:
+           res[N-2:0] = a[N-2:0] - b[N-2:0]; res[N-1] = 0
+       else:
+           res[N-2:0] = b[N-2:0] - a[N-2:0]; res[N-1] = (res[N-2:0]==0)?0:1
+   - Else (a negative, b positive):
+       if a[N-2:0] > b[N-2:0]:
+           res[N-2:0] = a[N-2:0] - b[N-2:0]; res[N-1] = (res[N-2:0]==0)?0:1
+       else:
+           res[N-2:0] = b[N-2:0] - a[N-2:0]; res[N-1] = 0
+3) Precision:
+   - Inputs and output share identical Q and N; no re-scaling required.
+4) Overflow:
+   - The design does not implement explicit saturation; the sign bit is assigned per the rules above.
+"""
+
+[timing]
+sensitivity = "always @(a or b)  // purely combinational"
+
+[assumptions]
+aligned_q = "Both inputs use the same Q and N as the output."
+range = "Two's complement range: [-2^(N-1-Q), 2^(N-1-Q) - 2^-Q]"
+stable_inputs = "Combinational block assumes a, b stable within a clock for downstream capture."
+
+[corner_cases]
+zero_result_sign = "When magnitude subtraction produces zero, result sign is forced to 0."
+max_min = "Large opposite-signed operands may mathematically overflow; module does not clamp."
+
+[assertions]
+same_sign_add_sign = "If a[N-1]==b[N-1], then c[N-1]==a[N-1]."
+diff_sign_magnitude = "If a[N-1]!=b[N-1], then lower magnitude is subtracted from higher magnitude."
+zero_sign_rule = "If c[N-2:0]==0 then c[N-1]==0."
+format_stability = "c preserves Q-format with the same binary point position as a and b."
+
+[testbench]
+stimulus = """
+- Parametrize N=32, Q=15.
+- Vectors:
+  1) Same sign add: a=0.5, b=0.25  -> c=0.75
+  2) Opp sign, |a|>|b|: a= 0.75, b=-0.25 -> c=0.5
+  3) Opp sign, |b|>|a|: a=-0.25, b= 0.75 -> c=0.5
+  4) Exact cancel: a=+x, b=-x -> c=0 with sign=0
+  5) Large magnitudes (near max/min) to observe non-saturated wrap behavior.
+"""
+checks = """
+- Verify binary results against software fixed-point model: (a+b) with same Q.
+- Ensure sign bit rules match: same-sign -> preserved; diff-sign -> by magnitude.
+- Ensure zero result forces sign bit to 0.
+"""
+
+[implementation_notes]
+mapping = "RTL directly implements the above rules with slices on [N-2:0] and explicit sign control."
+synthesis = "Combinational; consider registering output c for timing."
+saturation_option = "If saturation is desired, add overflow detection and clamp to max/min codes."

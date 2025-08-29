@@ -1,0 +1,57 @@
+[meta]
+name = "fsm"
+description = "Mealy FSM for detecting the input sequence '10011' on a serial input"
+author = "User"
+version = "1.0"
+
+[interface]
+IN = "input - Serial 1-bit input stream"
+CLK = "input - Clock signal for FSM"
+RST = "input - Synchronous reset signal (active high)"
+MATCH = "output - High (1) when the pattern '10011' is detected, low otherwise"
+
+[parameters]
+s0 = "000 - Idle state, waiting for first '1'"
+s1 = "001 - Received first '1'"
+s2 = "010 - Received '10'"
+s3 = "011 - Received '100'"
+s4 = "100 - Received '1001'"
+s5 = "101 - Received '10011' (match done, ready to loop)"
+
+[states]
+s0 = { next_on = { "IN=1" = "s1", "IN=0" = "s0" }, description = "Initial state" }
+s1 = { next_on = { "IN=1" = "s1", "IN=0" = "s2" }, description = "Matched 1" }
+s2 = { next_on = { "IN=1" = "s1", "IN=0" = "s3" }, description = "Matched 10" }
+s3 = { next_on = { "IN=1" = "s4", "IN=0" = "s0" }, description = "Matched 100" }
+s4 = { next_on = { "IN=1" = "s5", "IN=0" = "s2" }, description = "Matched 1001" }
+s5 = { next_on = { "IN=1" = "s1", "IN=0" = "s2" }, description = "Matched 10011 (assert MATCH)" }
+
+[behavior]
+type = "pattern detection (Mealy FSM)"
+pattern = "10011"
+description = """
+This module implements a Mealy-type FSM that detects the binary sequence 10011 on a serial input `IN`.
+- The output `MATCH` becomes 1 **at the same cycle** as the final `1` of the matched pattern.
+- The FSM supports **overlapping matches**, e.g., an input of 100110011 will produce MATCH pulses at the 5th and 9th clock cycles.
+"""
+
+[timing]
+sensitivity = "posedge CLK or posedge RST"
+reset_behavior = "If RST is high, FSM resets to s0 and MATCH is cleared"
+match_assertion = "MATCH is asserted (1) when current_state == s4 and IN == 1, i.e., 1001 + 1"
+
+[assertions]
+reset_clears = "When RST is asserted, ST_cr == s0 and MATCH == 0"
+match_condition = "MATCH == 1 iff FSM is in s4 and IN == 1"
+nonmatch_condition = "MATCH == 0 otherwise"
+
+[testbench]
+stimulus = """
+Input IN sequence: 1 0 0 1 1 0 0 1 1
+Expected MATCH output: 0 0 0 0 1 0 0 0 1
+"""
+check = """
+- FSM correctly detects 10011 patterns, even overlapping
+- MATCH is asserted on same clock as final '1' of pattern
+- FSM recovers and can detect multiple patterns in continuous stream
+"""

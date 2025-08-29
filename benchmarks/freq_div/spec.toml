@@ -1,0 +1,59 @@
+[meta]
+name = "freq_div"
+description = "Frequency divider generating 50MHz, 10MHz, and 1MHz clocks from 100MHz input"
+author = "User"
+version = "1.0"
+
+[interface]
+CLK_in = "input - 100MHz input clock"
+RST = "input - active-high synchronous reset signal"
+CLK_50 = "output reg - 50MHz output clock (CLK_in ÷ 2)"
+CLK_10 = "output reg - 10MHz output clock (CLK_in ÷ 10)"
+CLK_1  = "output reg - 1MHz output clock (CLK_in ÷ 100)"
+
+[behavior]
+type = "synchronous"
+description = """
+This module divides a 100MHz input clock into three output clocks using counters and flip-flops:
+- CLK_50 toggles every clock cycle (÷2)
+- CLK_10 toggles every 5 input clocks (÷10)
+- CLK_1  toggles every 50 input clocks (÷100)
+
+The counters count half periods (i.e., toggle at N), so full period = 2×N×CLK_in period.
+All logic is triggered on the rising edge of CLK_in and reset by synchronous reset RST.
+"""
+
+[internal]
+cnt_10 = { width = 4, description = "Counter for CLK_10 toggle every 5 cycles (half-period of 10MHz)" }
+cnt_100 = { width = 7, description = "Counter for CLK_1 toggle every 50 cycles (half-period of 1MHz)" }
+
+[clock_generation]
+CLK_50 = "Toggle on every rising edge of CLK_in (÷2)"
+CLK_10 = "Toggle when cnt_10 == 4 (5 cycles → toggle → full period = 10)"
+CLK_1  = "Toggle when cnt_100 == 49 (50 cycles → toggle → full period = 100)"
+
+[assertions]
+reset_behavior = "All clocks are reset to 0 on RST"
+toggle_correctness = """
+- CLK_50 toggles every cycle
+- CLK_10 toggles every 5 cycles of CLK_in
+- CLK_1 toggles every 50 cycles of CLK_in
+"""
+counter_ranges = """
+- cnt_10 in [0,4], resets after reaching 4
+- cnt_100 in [0,49], resets after reaching 49
+"""
+
+[testbench]
+stimulus = """
+- Apply CLK_in as 100MHz clock
+- Assert and deassert RST to check reset behavior
+- Run for 200+ cycles to observe all output frequencies
+"""
+check = """
+- CLK_50 toggles every 1 cycle (period: 2)
+- CLK_10 toggles every 5 cycles (period: 10)
+- CLK_1 toggles every 50 cycles (period: 100)
+- All clocks reset to 0 upon RST
+- Counters reset appropriately and toggle outputs
+"""

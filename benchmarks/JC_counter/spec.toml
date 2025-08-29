@@ -1,0 +1,51 @@
+[meta]
+name = "JC_counter"
+description = "64-bit Johnson (torsional ring) counter"
+author = "User"
+version = "1.0"
+
+[interface]
+clk = "input - Clock signal used for synchronous state update"
+rst_n = "input - Active-low reset signal"
+Q = "output - 64-bit Johnson counter state"
+
+[behavior]
+type = "Johnson counter (torsional ring)"
+bit_width = 64
+description = """
+Implements a 64-bit Johnson counter, also known as a torsional ring counter.
+- On each clock rising edge, the counter shifts right.
+- If the LSB Q[0] is 0, insert a 1 into MSB.
+- If the LSB Q[0] is 1, insert a 0 into MSB.
+This creates a reflected sequence of bits that cycles through 2N unique states for N-bit counter (128 states for 64-bit).
+"""
+
+[timing]
+sensitivity = "posedge clk or negedge rst_n"
+reset_behavior = "When rst_n == 0, Q is reset to 0 (all bits cleared)"
+update_logic = """
+If Q[0] == 0:
+    Q <= {1'b1, Q[63:1]}   # Insert 1 into MSB
+Else:
+    Q <= {1'b0, Q[63:1]}   # Insert 0 into MSB
+"""
+
+[examples]
+Q_sequence_4bit = ["0000", "1000", "1100", "1110", "1111", "0111", "0011", "0001", "0000"]
+Q_sequence_64bit = "Same pattern as 4-bit Johnson counter, but extended to 64 bits, resulting in 128 unique states"
+
+[assertions]
+reset_assertion = "When rst_n is 0, Q == 64'b0"
+cycling_assertion = "The counter passes through exactly 128 unique states before repeating"
+
+[testbench]
+stimulus = """
+- Apply reset for 1 cycle
+- Drive clk continuously
+- Capture Q every cycle
+"""
+check = """
+- Confirm Q starts from 64'b0 after reset
+- Verify that each Q[n] = {new_bit, Q[n-1][63:1]} where new_bit = ~Q[n-1][0]
+- Confirm that the sequence cycles after 128 unique values
+"""

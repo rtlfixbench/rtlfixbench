@@ -1,0 +1,78 @@
+[meta]
+name = "fixed_point_subtractor"
+description = "Parameterized fixed-point subtractor (signed Q-format) performing (a - b) via sign-aware magnitude add/sub."
+version = "1.0"
+author = "User"
+
+[parameters]
+Q = "Number of fractional bits (precision), e.g., 15"
+N = "Total data width in bits (includes sign + integer + fractional), e.g., 32"
+
+[interface]
+a = "input  [N-1:0] - Fixed-point operand a (signed two's complement, Q-format)"
+b = "input  [N-1:0] - Fixed-point operand b (signed two's complement, Q-format)"
+c = "output [N-1:0] - Result of a - b in same Q-format"
+
+[internal]
+res = "reg [N-1:0] - Intermediate/registered combinational result assigned to c"
+
+[encoding]
+format = "Signed two's complement fixed point (Q fractional bits)"
+sign_bit = "Bit [N-1]"
+fractional_bits = "Q"
+integer_bits = "N-1-Q (excluding sign bit)"
+
+[behavior]
+type = "Combinational"
+equation = "c = a - b"
+rules = """
+1) Same-sign subtraction:
+   - If a[N-1] == b[N-1]:
+       res[N-2:0] = a[N-2:0] - b[N-2:0]
+       res[N-1]   = a[N-1]      // keep input sign
+2) Different-sign subtraction (equivalent to |a| + |b|):
+   - If a is positive (0) and b is negative (1):
+       res[N-2:0] = a[N-2:0] + b[N-2:0]
+       res[N-1]   = (res[N-2:0]==0) ? 0 : 0  // positive if nonzero; force 0 when zero
+   - Else (a negative, b positive):
+       res[N-2:0] = a[N-2:0] + b[N-2:0]
+       res[N-1]   = (res[N-2:0]==0) ? 0 : 1  // negative if nonzero; force 0 when zero
+3) Zero handling:
+   - If res[N-2:0] == 0, force res[N-1] = 0 to avoid '-0'.
+4) Precision:
+   - Inputs/outputs share same (N, Q); no re-scaling required.
+"""
+
+[timing]
+sensitivity = "always @(a or b)  // purely combinational"
+
+[assumptions]
+aligned_q = "Both inputs use identical Q and N as the output."
+range = "Two's complement range: [-2^(N-1-Q), 2^(N-1-Q) - 2^-Q]"
+stability = "Downstream logic should register c if required for timing."
+
+[corner_cases]
+zero_result = "When |a| == |b| and signs differ appropriately, the result is exactly zero with sign forced to 0."
+large_magnitudes = "No explicit saturation; large magnitude operations may mathematically overflow the N-bit range."
+
+[assertions]
+sign_rule_same = "If a[N-1]==b[N-1], then c sign matches a[N-1] per implementation."
+zero_sign_rule = "If c[N-2:0]==0 then c[N-1]==0 (no negative zero)."
+format_consistency = "c preserves the same Q-format as a and b."
+
+[testbench]
+stimulus = """
+Parameters: N=32, Q=15
+Vectors (expressed as fixed-point):
+1) Same-sign:  a= +0.75, b= +0.25  -> c= +0.50
+2) Same-sign:  a= -0.75, b= -0.25  -> c= -0.50
+3) Diff-sign:  a= +0.50, b= -0.25  -> c= +0.75
+4) Diff-sign:  a= -0.25, b= +0.50  -> c= -0.75
+5) Cancel:     a= +x,    b= +x     -> c=  0
+6) Cancel:     a= +x,    b= -x     -> c= +2x  (magnitude add)
+"""
+checks = """
+- Compare c against software fixed-point model for a - b with (N,Q).
+- Verify sign rules for same-sign vs different-sign cases.
+- Ensure c==0 sets sign bit to 0.
+"""

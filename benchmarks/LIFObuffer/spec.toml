@@ -1,0 +1,97 @@
+[meta]
+name = "LIFObuffer"
+description = "4-bit × 4-depth synchronous LIFO (stack) with push/pop, FULL/EMPTY flags."
+version = "1.0"
+author = "User"
+
+[parameters]
+WIDTH = "4  # data width"
+DEPTH = "4  # number of stack entries"
+
+[interface]
+dataIn  = "input  [3:0]  - Data to push"
+RW      = "input         - Read/Write control: 0=push(write), 1=pop(read)"
+EN      = "input         - Enable buffer operation"
+Rst     = "input         - Active-high synchronous reset"
+Clk     = "input         - Clock"
+EMPTY   = "output reg    - High when stack is empty"
+FULL    = "output reg    - High when stack is full"
+dataOut = "output reg[3:0]- Data popped from stack"
+
+[internal]
+stack_mem = "reg [3:0] stack_mem[0:3]  # storage array (DEPTH entries)"
+SP        = "reg [2:0]                 # stack pointer; SP==4 => empty, SP==0 => full"
+i         = "integer                   # loop index for reset/clear"
+
+[conventions]
+sp_definition = """
+- Stack grows downward:
+  * Empty stack: SP = 4 (no valid elements)
+  * After push:  SP := SP - 1; write to stack_mem[SP]
+  * After pop:   read stack_mem[SP]; clear it; SP := SP + 1
+- FULL  = (SP == 0)
+- EMPTY = (SP[2] == 1)  // equivalently SP == 4 for DEPTH=4
+"""
+
+[behavior]
+timing = "Sequential on posedge Clk; operations gated by EN"
+reset  = """
+If EN==1 and Rst==1:
+  - SP := 4
+  - dataOut := 0
+  - stack_mem[*] := 0
+  - EMPTY := 1, FULL := 0
+"""
+operation = """
+If EN==1 and Rst==0:
+  - Update flags: FULL := (SP==0); EMPTY := (SP[2]==1); dataOut := 'hx by default.
+  - Push (write) when RW==0 and not FULL:
+      SP := SP - 1
+      stack_mem[SP] := dataIn
+      Update flags after SP change.
+  - Pop (read) when RW==1 and not EMPTY:
+      dataOut := stack_mem[SP]
+      stack_mem[SP] := 0
+      SP := SP + 1
+      Update flags after SP change.
+  - Otherwise: retain contents; flags reflect current SP.
+"""
+simultaneous = "No simultaneous push and pop; RW selects one operation per cycle."
+
+[flags]
+full_condition  = "FULL == 1 when SP == 0"
+empty_condition = "EMPTY == 1 when SP == 4 (for DEPTH=4)"
+
+[corner_cases]
+ignore_when_disabled = "If EN==0, no state changes."
+underflow_protect    = "Pop ignored when EMPTY==1."
+overflow_protect     = "Push ignored when FULL==1."
+x_on_idle_read       = "When not popping, dataOut is set to 'hx in this implementation."
+
+[timing_notes]
+clocking = "All state changes on posedge Clk."
+reset_type = "Synchronous active-high (honored inside the posedge block with EN gating)."
+
+[assertions]
+no_push_when_full = "If FULL and RW==0 and EN, then SP must not decrement."
+no_pop_when_empty = "If EMPTY and RW==1 and EN, then SP must not increment."
+flag_consistency  = "FULL == (SP==0) and EMPTY == (SP==4)."
+lifo_order        = "Sequence of pops returns data in reverse order of pushes."
+
+[testbench]
+stimulus = """
+1) Reset:
+   - EN=1, Rst=1 for 1-2 cycles → expect EMPTY=1, FULL=0, SP=4, mem cleared.
+2) Push 4 entries:
+   - For k=0..3: RW=0, EN=1, dataIn=k → after 4 pushes: FULL=1, EMPTY=0, SP=0.
+3) Pop 4 entries:
+   - For k=3..0: RW=1, EN=1 → expect dataOut sequence 3,2,1,0; EMPTY=1 at end.
+4) Overflow/Underflow:
+   - Push when FULL=1 → no change.
+   - Pop when EMPTY=1 → no change.
+"""
+expected = """
+- LIFO order is preserved.
+- FULL/EMPTY flags track SP correctly.
+- After reset, memory and outputs are cleared as specified.
+"""

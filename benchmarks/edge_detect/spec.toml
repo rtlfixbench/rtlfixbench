@@ -1,0 +1,48 @@
+[meta]
+name = "edge_detect"
+description = "1-bit input signal edge detector with rise and down indicators"
+author = "User"
+version = "1.0"
+
+[interface]
+clk = "input - Clock signal"
+rst_n = "input - Active-low reset signal"
+a = "input - 1-bit signal to be monitored for edges"
+rise = "output - High (1) when rising edge of 'a' is detected"
+down = "output - High (1) when falling edge of 'a' is detected"
+
+[internal]
+a0 = { width = 1, description = "Previous value of input signal a, registered at clk edge" }
+
+[behavior]
+type = "edge detection"
+description = """
+This module detects edges of a slow-changing digital signal `a`:
+- A **rising edge** is defined as `a` transitioning from 0 to 1 (`a == 1 && a0 == 0`)
+- A **falling edge** is defined as `a` transitioning from 1 to 0 (`a == 0 && a0 == 1`)
+- Outputs `rise` and `down` are pulse signals set high for 1 clock cycle upon edge detection
+- If no edge is detected, both outputs remain 0
+- Edge detection is synchronous with clk, but reset is asynchronous
+"""
+
+[timing]
+sensitivity = "posedge clk or negedge rst_n"
+note = "Output pulses (rise/down) are active for 1 cycle and reset asynchronously"
+
+[assertions]
+rise_edge = "If a transitions from 0 to 1, then rise == 1 for one clk cycle"
+down_edge = "If a transitions from 1 to 0, then down == 1 for one clk cycle"
+no_edge = "If no edge, rise == 0 and down == 0"
+reset_clear = "If rst_n == 0, rise == 0, down == 0, a0 == 0"
+
+[testbench]
+stimulus = """
+- Provide toggled `a` input: 0→1→0→1→0 to test both rising and falling edges
+- Provide stable `a` input: constant 0 or constant 1 to confirm no false positives
+- Toggle reset during edge conditions to verify proper asynchronous clearing
+"""
+check = """
+- rise == 1 only on 0→1 transition
+- down == 1 only on 1→0 transition
+- both outputs == 0 otherwise
+"""
