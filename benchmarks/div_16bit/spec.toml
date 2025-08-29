@@ -1,0 +1,64 @@
+[meta]
+name = "div_16bit"
+description = "16-bit combinational divider with 8-bit divisor, implemented using shift-subtract method."
+author = "User"
+version = "1.0"
+
+[interface]
+A = "input [15:0] - Dividend (16-bit unsigned)"
+B = "input [7:0]  - Divisor (8-bit unsigned)"
+result = "output [15:0] - Quotient of A divided by B"
+odd = "output [15:0] - Remainder of A divided by B"
+
+[behavior]
+type = "combinational"
+description = """
+This divider implements 16-bit unsigned division using a shift-subtract algorithm in combinational logic.
+The dividend is left-shifted bit-by-bit and compared against a left-shifted divisor.
+If the shifted dividend is greater than or equal to the divisor, the quotient bit is set to 1 and the difference is retained.
+Otherwise, the quotient bit is 0 and the original value is preserved.
+This process repeats for 16 cycles, yielding a 16-bit quotient and 16-bit remainder.
+The algorithm mimics a manual division process by iteratively aligning bits and subtracting.
+"""
+
+[internal]
+a_reg = { width = 16, description = "Register holding input A" }
+b_reg = { width = 16, description = "Register holding input B, zero-padded" }
+tmp_a = { width = 32, description = "Working register for shifted dividend and remainder" }
+tmp_b = { width = 32, description = "Shifted version of divisor" }
+i = { width = 32, description = "Loop iterator for 16 iterations" }
+
+[algorithm]
+method = "Shift-subtract"
+steps = """
+1. Zero-extend A to 32 bits and assign to tmp_a.
+2. Left-shift B by 16 bits to form tmp_b.
+3. Repeat 16 times:
+    a. Left shift tmp_a by 1.
+    b. If tmp_a >= tmp_b: tmp_a = tmp_a - tmp_b + 1.
+    c. Else: tmp_a remains unchanged.
+4. After loop:
+    - result = tmp_a[15:0] (quotient)
+    - odd = tmp_a[31:16] (remainder)
+"""
+
+[assertions]
+divisor_nonzero = "Assume B != 0; behavior for B==0 is undefined and should be guarded externally"
+remainder_validity = "odd < B"
+quotient_range = "result <= 65535 (i.e., max 16-bit value)"
+
+[testbench]
+stimulus = """
+- Basic: A = 100, B = 10
+- Edge: A = 0, B = 1
+- Full scale: A = 65535, B = 255
+- Divisor > Dividend: A = 3, B = 100
+- Remainder only: A = 5, B = 2
+- Random pairs for regression test
+"""
+check = """
+- Validate that result == A / B and odd == A % B
+- Compare against behavioral division in golden model
+- Check that output stabilizes in one cycle (combinational)
+- Verify undefined result when B == 0 (optional assertion)
+"""

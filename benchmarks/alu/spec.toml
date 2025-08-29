@@ -1,0 +1,88 @@
+[meta]
+name = "verified_alu"
+description = "32-bit ALU supporting MIPS-ISA operations with flags for zero, carry, overflow, negative, and SLT/SLTU"
+author = "User"
+version = "1.0"
+
+[interface]
+a = "input [31:0] - Operand A"
+b = "input [31:0] - Operand B"
+aluc = "input [5:0] - ALU control code (MIPS opcode)"
+r = "output [31:0] - Result of the operation"
+zero = "output - 1 if result is zero"
+carry = "output - 1 if carry-out occurred (TODO: not implemented in this version)"
+negative = "output - 1 if result is negative (TODO: not implemented in this version)"
+overflow = "output - 1 if signed overflow occurred (TODO: not implemented in this version)"
+flag = "output - Result of SLT/SLTU; high impedance 'z' for other operations"
+
+[parameters]
+ADD = "6'b100000"
+ADDU = "6'b100001"
+SUB = "6'b100010"
+SUBU = "6'b100011"
+AND = "6'b100100"
+OR = "6'b100101"
+XOR = "6'b100110"
+NOR = "6'b100111"
+SLT = "6'b101010"
+SLTU = "6'b101011"
+SLL = "6'b000000"
+SRL = "6'b000010"
+SRA = "6'b000011"
+SLLV = "6'b000100"
+SRLV = "6'b000110"
+SRAV = "6'b000111"
+JR = "6'b001000 (not implemented)"
+LUI = "6'b001111"
+
+[internal]
+res = { width = 33, description = "Temporary register storing operation result with carry" }
+a_signed = { width = 32, signed = true, description = "Signed version of operand A" }
+b_signed = { width = 32, signed = true, description = "Signed version of operand B" }
+
+[behavior]
+type = "combinational ALU"
+data_flow = """
+- `res` stores intermediate result, extended to 33 bits for possible carry detection.
+- `r = res[31:0]`, lower 32 bits of result are output.
+- `zero = 1` when result is 0, otherwise 0.
+- `flag = (a < b)` only for SLT/SLTU, otherwise high impedance.
+"""
+shift_ops = "SLL, SRL, SRA use full `a` as shift amount; SLLV, SRLV, SRAV use `a[4:0]`"
+slt_flag_logic = "`flag = a_signed < b_signed` for SLT; `flag = a < b` for SLTU"
+undefined_behavior = "If `aluc` not matched, `res = 32'bz`, `flag = 1'bz`"
+
+[timing]
+type = "combinational"
+sensitivity_list = "always @(a or b or aluc)"
+note = "Ideal for use in single-cycle datapath designs; not pipelined"
+
+[assertions]
+zero_flag = "zero == 1 iff r == 32'b0"
+slt_flag_signed = "if aluc == SLT, then flag == (a_signed < b_signed)"
+slt_flag_unsigned = "if aluc == SLTU, then flag == (a < b)"
+res_logic = "r == result of ALU operation according to aluc"
+highz_flag = "flag == 1'bz for non-SLT/SLTU operations"
+
+[limitations]
+carry = "carry is declared but not assigned; currently always unknown (x)"
+negative = "negative is declared but not assigned; currently always unknown (x)"
+overflow = "overflow is declared but not assigned; currently always unknown (x)"
+jr_opcode = "JR opcode declared but not implemented in behavior"
+
+[testbench]
+stimulus = """
+- Test arithmetic ops: ADD, ADDU, SUB, SUBU for signed/unsigned
+- Test bitwise ops: AND, OR, XOR, NOR
+- Test shift ops: SLL, SRL, SRA, SLLV, SRLV, SRAV with various shift amounts
+- Test comparison: SLT, SLTU for various (a < b), (a == b), (a > b) cases
+- Test LUI: upper 16 bits loaded, lower 16 zeroed
+"""
+check = """
+- Verify correct output `r` for each opcode
+- Assert `flag` is correctly set for SLT/SLTU
+- Assert `zero == 1` iff r == 0
+- Confirm `flag` is 'z' for non-SLT/U ops
+- Check signedness in SRA, SLT
+- Optional: extend testbench to detect overflow/carry in ADD/SUB if implemented
+"""

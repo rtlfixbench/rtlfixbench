@@ -1,0 +1,80 @@
+[meta]
+name = "asyn_fifo"
+description = "Asynchronous FIFO with parameterized width and depth, supporting dual clock domains and Gray-coded full/empty detection."
+author = "User"
+version = "1.0"
+
+[interface]
+wclk = "input - Write clock domain"
+rclk = "input - Read clock domain"
+wrstn = "input - Active-low reset for write side"
+rrstn = "input - Active-low reset for read side"
+winc = "input - Write increment enable signal"
+rinc = "input - Read increment enable signal"
+wdata = "input [WIDTH-1:0] - Data to be written into FIFO"
+wfull = "output - Write full flag"
+rempty = "output - Read empty flag"
+rdata = "output [WIDTH-1:0] - Data read from FIFO"
+
+[parameter]
+WIDTH = "FIFO data width (default: 8)"
+DEPTH = "FIFO depth (default: 16)"
+
+[behavior]
+type = "asynchronous"
+description = """
+This FIFO uses a dual-port RAM to buffer data between asynchronous write and read clock domains.
+It divides into five major parts:
+1. Dual-Port RAM for data storage.
+2. Write-side controller and pointer generator (binary and Gray).
+3. Read-side controller and pointer generator.
+4. Read pointer synchronizer (to write clock domain).
+5. Write pointer synchronizer (to read clock domain).
+"""
+
+[internal]
+waddr_bin = { width = "ADDR_WIDTH+1", description = "Write address in binary, incremented on wclk" }
+raddr_bin = { width = "ADDR_WIDTH+1", description = "Read address in binary, incremented on rclk" }
+wptr = { width = "ADDR_WIDTH+1", description = "Write pointer in Gray code" }
+rptr = { width = "ADDR_WIDTH+1", description = "Read pointer in Gray code" }
+wptr_buff = { width = "ADDR_WIDTH+1", description = "First stage of synchronizing write pointer into rclk domain" }
+wptr_syn = { width = "ADDR_WIDTH+1", description = "Second stage of synchronizing write pointer into rclk domain" }
+rptr_buff = { width = "ADDR_WIDTH+1", description = "First stage of synchronizing read pointer into wclk domain" }
+rptr_syn = { width = "ADDR_WIDTH+1", description = "Second stage of synchronizing read pointer into wclk domain" }
+
+[full_empty_logic]
+gray_code_conversion = "gray = bin ^ (bin >> 1)"
+wfull_condition = "wptr == {~rptr_syn[MSB:MSB-1], rptr_syn[MSB-2:0]}"
+rempty_condition = "rptr == wptr_syn"
+address_indexing = "RAM address from binary pointer's lower bits: waddr_bin[ADDR_WIDTH-1:0]"
+
+[ram_interface]
+module = "dual_port_RAM"
+wclk = "Write clock"
+rclk = "Read clock"
+wenc = "Write enable = winc & !wfull"
+renc = "Read enable = rinc & !rempty"
+waddr = "Write address (binary lower bits)"
+raddr = "Read address (binary lower bits)"
+wdata = "Write data"
+rdata = "Read data"
+
+[assertions]
+reset_behavior = "All pointers and synchronizers should reset to zero when wrstn or rrstn is low"
+write_guard = "No write occurs when FIFO is full (wfull=1)"
+read_guard = "No read occurs when FIFO is empty (rempty=1)"
+gray_code_stability = "Gray-coded pointers transition one bit at a time"
+cdc_sync_depth = "All cross-domain pointers use two-stage synchronizers"
+
+[testbench]
+stimulus = """
+- Write and read with independent clocks (random phases)
+- Burst write then burst read
+- Read/write simultaneously
+- Reset during write/read operation
+"""
+check = """
+- Validate data integrity: output rdata matches input wdata (FIFO behavior)
+- Ensure wfull and rempty flags are asserted correctly
+- Assert no glitches in rdata due to unsynchronized access
+"""

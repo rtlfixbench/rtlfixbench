@@ -1,0 +1,53 @@
+[meta]
+name = "barrel_shifter"
+description = "8-bit barrel shifter using 3-bit control for shifts of 1, 2, or 4 bits."
+version = "1.0"
+author = "User"
+
+[parameters]
+WIDTH = "8   # Data width"
+CTRL_WIDTH = "3   # Control signal width for shifts (1, 2, 4 positions)"
+
+[interface]
+in    = "input  [7:0]   - 8-bit input data to be shifted"
+ctrl  = "input  [2:0]   - 3-bit shift control (ctrl[2]=4-bit shift, ctrl[1]=2-bit shift, ctrl[0]=1-bit shift)"
+out   = "output [7:0]   - 8-bit shifted output"
+
+[submodules.mux2X1]
+in0 = "input  - first input"
+in1 = "input  - second input"
+sel = "input  - select signal (1 selects in1, 0 selects in0)"
+out = "output - selected output"
+function = "2-to-1 multiplexer used in shift stages"
+
+[implementation]
+concept = """
+The design uses cascaded stages of 2-to-1 multiplexers to implement shifts of 4, 2, and 1 bit(s).
+- Stage 1 (ctrl[2]): conditionally shifts the input right by 4 bits.
+- Stage 2 (ctrl[1]): conditionally shifts the intermediate value right by 2 bits.
+- Stage 3 (ctrl[0]): conditionally shifts the intermediate value right by 1 bit.
+"""
+behavior = """
+- When ctrl=000: out=in (no shift).
+- When ctrl=001: shift right by 1.
+- When ctrl=010: shift right by 2.
+- When ctrl=100: shift right by 4.
+- Combinations produce additive shifts (e.g., 111 = shift right by 7).
+- Vacated bits are filled with 0.
+"""
+rotation = "This implementation performs logical right shifts, not rotations."
+
+[corner_cases]
+all_zero_ctrl = "Output equals input when ctrl=000."
+max_shift = "When ctrl=111, result is a 7-bit right shift with zero fill."
+zero_input = "If in=00000000, out remains zero regardless of shift."
+
+[testbench]
+stimulus = """
+1) ctrl=000, in=10101010 → out=10101010.
+2) ctrl=001, in=10101010 → out=01010101.
+3) ctrl=010, in=11110000 → out=00111100.
+4) ctrl=100, in=11110000 → out=00001111.
+5) ctrl=111, in=10000000 → out=00000001.
+"""
+expected = "Shifts match control encoding, filling zeros from MSB side."

@@ -1,0 +1,27 @@
+[name]
+comparator_4bit = "4-bit comparator module for binary number comparison"
+
+[interface]
+inputs  = ["A[3:0]", "B[3:0]"]
+outputs = ["A_greater", "A_equal", "A_less"]
+
+[description]
+comparator_4bit = """
+This module compares two 4-bit binary numbers (A and B).
+It generates three mutually exclusive outputs:
+- A_greater: High when A > B
+- A_equal:   High when A == B
+- A_less:    High when A < B
+"""
+
+[implementation]
+logic = """
+- Perform subtraction (A - B) with an extra MSB to capture borrow.
+- If A == B, then A_equal = 1.
+- If no borrow occurs and A != B, then A_greater = 1.
+- If borrow occurs, then A_less = 1.
+Outputs are mutually exclusive, only one will be high at any time.
+"""
+
+[parameters]
+bitwidth = 4

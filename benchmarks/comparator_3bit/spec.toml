@@ -1,0 +1,41 @@
+[meta]
+name = "comparator_3bit"
+description = "3-bit comparator for binary number comparison."
+version = "1.0"
+author = "User"
+
+[parameter]
+DATA_WIDTH = 3
+
+[interface]
+A         = "input [2:0] - First binary number operand"
+B         = "input [2:0] - Second binary number operand"
+A_greater = "output - 1 if A > B"
+A_equal   = "output - 1 if A == B"
+A_less    = "output - 1 if A < B"
+
+[operation]
+trigger = "combinational (continuous assignment)"
+behavior = """
+- A_greater is asserted when input A is greater than input B.
+- A_equal is asserted when input A is equal to input B.
+- A_less is asserted when input A is less than input B.
+- Only one of A_greater, A_equal, or A_less can be high at any time.
+"""
+
+[assumptions]
+unsigned_mode = "Inputs A and B are treated as unsigned 3-bit binary numbers."
+mutual_exclusion = "Only one output signal is active (1) at a given time."
+
+[assertions]
+correctness = "For all A, B in [0,7], exactly one of {A_greater, A_equal, A_less} is 1."
+
+[testbench]
+stimulus = """
+- Case1: A=3 (011), B=5 (101) → A_less=1
+- Case2: A=6 (110), B=2 (010) → A_greater=1
+- Case3: A=4 (100), B=4 (100) → A_equal=1
+"""
+expected = """
+- Verify that A_greater, A_equal, and A_less outputs reflect the correct comparison between A and B.
+"""
